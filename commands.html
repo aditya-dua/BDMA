@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command Reference — MongoDB &amp; Redis | BDMA</title>
+  <meta name="description" content="Every mongosh and redis-cli command used across BDMA Lectures 11–20, on one searchable page." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/notes.css" />
+  <link rel="stylesheet" href="assets/css/pages.css" />
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Command Reference</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Modules 1–4</span>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Reference</div>
+  <h1>MongoDB &amp; Redis Command Reference</h1>
+  <p class="subtitle">Every command used across Lectures 11–20, with the dataset they were taught on. Search it during the lab instead of scrolling the notes.</p>
+  <div class="meta-row">
+    <span>🗄 <strong>Database:</strong> <code>bdma</code></span>
+    <span>📦 <strong>Collection:</strong> <code>rides</code></span>
+    <span>📄 <strong>Documents:</strong> 15,000</span>
+    <span>⌨️ <strong>Shells:</strong> mongosh · redis-cli</span>
+  </div>
+
+  <div class="cmd-filter">
+    <input type="text" id="cmdSearch" placeholder="Filter commands — try &quot;index&quot;, &quot;aggregate&quot;, &quot;bitmap&quot;, &quot;zadd&quot;…" autocomplete="off" spellcheck="false" />
+    <div class="cmd-count" id="cmdCount">—</div>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Multi-word search is an AND.</strong> Typing <code>index sort</code> shows only rows containing both. Press <kbd>Esc</kbd> to clear.</p>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Connecting &amp; Loading Data</h3>
+
+    <div class="cmd-row">
+      <code>mongosh "mongodb+srv://&lt;user&gt;:&lt;pass&gt;@cluster0.xxxxx.mongodb.net/"</code>
+      <div class="cmd-desc">Connect to an Atlas cluster. The connection string comes from <strong>Atlas → Connect → Shell</strong>. Never commit it to git.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>mongoimport --uri "&lt;connection-string&gt;" --db bdma --collection rides --file data/uber_bookings.json --jsonArray --drop</code>
+      <div class="cmd-desc">Load the course dataset. <code>--jsonArray</code> is required because the file is one JSON array; <code>--drop</code> makes the import repeatable.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>use bdma</code>
+      <div class="cmd-desc">Switch the active database. MongoDB creates it lazily on first write — a typo here silently makes a new empty database.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>show dbs</code> <code>show collections</code>
+      <div class="cmd-desc">List databases, then collections in the current database. First thing to run when an import looks like it did nothing.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.countDocuments()</code>
+      <div class="cmd-desc">Exact document count. Should return <strong>15000</strong> after a clean import. Prefer this over the faster-but-approximate <code>estimatedDocumentCount()</code> when verifying a load.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.findOne()</code>
+      <div class="cmd-desc">Return a single document. The fastest way to confirm the field names and nesting actually match what you expected.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.drop()</code>
+      <div class="cmd-desc">Delete the whole collection, indexes included. Reload with <code>mongoimport</code> afterwards.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Reading — find, project, sort, paginate</h3>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ status: "Completed" })</code>
+      <div class="cmd-desc">Equality match. Returns a cursor; <code>mongosh</code> prints the first 20 and waits for <code>it</code>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ status: "Completed" }, { booking_id: 1, booking_value: 1, _id: 0 })</code>
+      <div class="cmd-desc"><strong>Projection.</strong> Second argument picks fields. <code>_id</code> is returned unless you explicitly suppress it.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ "route.pickup": "Connaught Place" })</code>
+      <div class="cmd-desc">Query a nested field with <strong>dot notation</strong>. The quotes around the key are mandatory.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ booking_value: { $gt: 500 } })</code>
+      <div class="cmd-desc">Comparison operators: <code>$gt $gte $lt $lte $ne</code>. Documents missing <code>booking_value</code> never match a <code>$gt</code>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ vehicle_type: { $in: ["Uber XL", "Premier Sedan"] } })</code>
+      <div class="cmd-desc">Match any value in a list. <code>$nin</code> is the negation.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ status: "Completed", booking_value: { $gt: 800 } })</code>
+      <div class="cmd-desc">Multiple keys in one object are an implicit <strong>AND</strong>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ $or: [{ status: "Cancelled by Driver" }, { status: "No Driver Found" }] })</code>
+      <div class="cmd-desc">Explicit <strong>OR</strong>. <code>$and</code>, <code>$nor</code> and <code>$not</code> follow the same shape.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ ratings: { $exists: false } })</code>
+      <div class="cmd-desc"><strong>Field absence.</strong> In this dataset <code>ratings</code>, <code>booking_value</code> and <code>payment_method</code> are absent on non-completed bookings — absence carries meaning.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ "cancellation.reason": { $regex: /AC/i } })</code>
+      <div class="cmd-desc">Pattern match. An unanchored regex cannot use an index efficiently — anchor with <code>/^AC/</code> when you can.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find().sort({ booking_value: -1 }).limit(10)</code>
+      <div class="cmd-desc">Top 10 by value. <code>-1</code> descending, <code>1</code> ascending.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find().skip(20).limit(10)</code>
+      <div class="cmd-desc">Pagination. <code>skip()</code> degrades on large offsets because the server still walks the skipped documents — range queries scale better.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.distinct("vehicle_type")</code>
+      <div class="cmd-desc">Unique values for a field. Returns the seven vehicle types in this dataset.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.countDocuments({ status: "Cancelled by Driver" })</code>
+      <div class="cmd-desc">Count matching a filter — <strong>2698</strong> here, 17.99% of all bookings.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Writing — insert, update, delete</h3>
+
+    <div class="cmd-row">
+      <code>db.rides.insertOne({ booking_id: "CNR999001", status: "Completed", booking_value: 250 })</code>
+      <div class="cmd-desc">Insert one document. MongoDB generates <code>_id</code> if you omit it.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.insertMany([{ ... }, { ... }])</code>
+      <div class="cmd-desc">Bulk insert. Add <code>{ ordered: false }</code> to continue past individual failures.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.updateOne({ booking_id: "CNR3000142" }, { $set: { payment_method: "UPI" } })</code>
+      <div class="cmd-desc"><code>$set</code> creates the field if it is missing. Forgetting <code>$set</code> and passing a bare object <strong>replaces the whole document</strong>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.updateMany({ status: "Incomplete" }, { $set: { review_flag: true } })</code>
+      <div class="cmd-desc">Update every matching document. Always run the same filter through <code>countDocuments()</code> first.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.updateOne({ booking_id: "CNR3000142" }, { $inc: { booking_value: 50 } })</code>
+      <div class="cmd-desc">Atomic increment. <code>$mul</code>, <code>$min</code> and <code>$max</code> work the same way.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.updateMany({}, { $unset: { review_flag: "" } })</code>
+      <div class="cmd-desc">Remove a field from every document. The value passed to <code>$unset</code> is ignored.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.updateOne({ booking_id: "X" }, { $set: { status: "Completed" } }, { upsert: true })</code>
+      <div class="cmd-desc"><strong>Upsert</strong> — update if present, insert if not. The workhorse of idempotent data loads.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.deleteMany({ status: "Incomplete" })</code>
+      <div class="cmd-desc">Delete matching documents. <code>deleteMany({})</code> empties the collection but keeps the indexes.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Indexing &amp; Query Plans</h3>
+
+    <div class="cmd-row">
+      <code>db.rides.createIndex({ status: 1 })</code>
+      <div class="cmd-desc">Single-field B-tree index. Ascending or descending does not matter for a single-field index.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.createIndex({ status: 1, booking_value: -1 })</code>
+      <div class="cmd-desc"><strong>Compound index.</strong> Field order follows the <strong>ESR rule</strong>: Equality, then Sort, then Range.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.createIndex({ booking_id: 1 }, { unique: true })</code>
+      <div class="cmd-desc">Unique index — rejects duplicates and enforces the business key at the database layer.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.createIndex({ booking_value: 1 }, { partialFilterExpression: { status: "Completed" } })</code>
+      <div class="cmd-desc"><strong>Partial index.</strong> Indexes only the 9,343 completed rides instead of all 15,000 — smaller, faster to maintain.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.createIndex({ "cancellation.reason": "text" })</code>
+      <div class="cmd-desc">Text index for keyword search. A collection may have only one.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.getIndexes()</code>
+      <div class="cmd-desc">List every index. <code>_id_</code> is always present and cannot be dropped.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.dropIndex("status_1")</code>
+      <div class="cmd-desc">Drop by name. Unused indexes still cost write throughput and disk.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ status: "Completed" }).explain("executionStats")</code>
+      <div class="cmd-desc"><strong>The one to memorise.</strong> Compare <code>totalDocsExamined</code> with <code>nReturned</code> — if docs examined is far larger, the index is not doing its job.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.find({ ... }).explain("executionStats").executionStats.executionTimeMillis</code>
+      <div class="cmd-desc">Measured execution time. Run it before and after adding an index — that before/after pair is what the project rubric asks for.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>COLLSCAN</code> vs <code>IXSCAN</code>
+      <div class="cmd-desc">The <code>stage</code> in an explain plan. <strong>COLLSCAN</strong> reads every document; <strong>IXSCAN</strong> walks an index. Seeing COLLSCAN on a large collection is the signal to add an index.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>db.rides.aggregate([...], { explain: true })</code>
+      <div class="cmd-desc">Explain a pipeline. Confirms whether <code>$match</code> and <code>$sort</code> were pushed down to an index.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Aggregation Framework</h3>
+
+    <div class="cmd-row">
+      <code>db.rides.aggregate([{ $match: { status: "Completed" } }])</code>
+      <div class="cmd-desc"><strong>Always put <code>$match</code> first.</strong> It is the only stage that can use an index, and it shrinks everything downstream.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $group: { _id: "$vehicle_type", revenue: { $sum: "$booking_value" }, n: { $sum: 1 } } }</code>
+      <div class="cmd-desc">Group and aggregate. <code>_id</code> is the grouping key; <code>{ $sum: 1 }</code> counts documents.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $group: { _id: null, total: { $sum: "$booking_value" } } }</code>
+      <div class="cmd-desc"><code>_id: null</code> collapses everything into one bucket — a grand total across the collection.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $group: { _id: "$status", avg: { $avg: "$booking_value" }, max: { $max: "$booking_value" } } }</code>
+      <div class="cmd-desc"><code>$avg $min $max $first $last $push $addToSet</code> are the accumulators. <code>$avg</code> silently skips missing fields.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $sort: { revenue: -1 } }</code> <code>{ $limit: 10 }</code>
+      <div class="cmd-desc">Rank and truncate. Putting <code>$limit</code> straight after <code>$sort</code> lets the server use a bounded top-K sort.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $project: { _id: 0, vehicle: "$_id", revenue: { $round: ["$revenue", 2] } } }</code>
+      <div class="cmd-desc">Reshape and rename output. <code>$round</code> makes the result presentable.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $match: { bookings: { $gte: 1000 } } }</code>
+      <div class="cmd-desc"><strong>Guard against small samples.</strong> Place after <code>$group</code> to drop thin buckets before ranking by a rate — otherwise 03:00, with 46 bookings, tops the failure-rate chart on noise alone.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $addFields: { hour: { $toInt: { $substr: ["$booked_at", 11, 2] } } } }</code>
+      <div class="cmd-desc">Derive the booking hour. <code>booked_at</code> is stored as a string in this dataset, so we slice it rather than use a date operator.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $addFields: { ts: { $toDate: "$booked_at" } } }</code>
+      <div class="cmd-desc">Convert the string to a real BSON date so the <code>$year</code>/<code>$month</code>/<code>$hour</code> operators become available.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $dateFromString: { dateString: "$booked_at" } }</code>
+      <div class="cmd-desc">The explicit form, with <code>format</code> and <code>onError</code> options for messy input.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $cond: [{ $eq: ["$status", "Completed"] }, 1, 0] }</code>
+      <div class="cmd-desc"><strong>Conditional counting.</strong> Wrap in <code>$sum</code> to count a subset inside a group — this is how a completion rate is computed in one pass.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $ifNull: ["$booking_value", 0] }</code>
+      <div class="cmd-desc">Substitute a default for a missing field. Essential here because failed bookings have no <code>booking_value</code>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $unwind: "$tags" }</code>
+      <div class="cmd-desc">Explode an array field into one document per element. Multiplies the document count — always <code>$match</code> before it.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $lookup: { from: "drivers", localField: "driver_id", foreignField: "_id", as: "driver" } }</code>
+      <div class="cmd-desc">A left outer join. Works, but if you reach for it constantly the documents probably should have been embedded.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $facet: { byStatus: [...], byHour: [...] } }</code>
+      <div class="cmd-desc">Run several sub-pipelines over the same input in one pass. This is how a whole dashboard payload is produced in a single query.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>{ $out: "rides_summary" }</code>
+      <div class="cmd-desc">Write pipeline results to a new collection. <code>$merge</code> is the incremental version and must be the last stage.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Redis — Keys, Strings &amp; Expiry</h3>
+
+    <div class="cmd-row">
+      <code>docker run -d --name bdma-redis -p 6379:6379 redis:7-alpine</code>
+      <div class="cmd-desc">Start a local Redis. <code>docker stop bdma-redis</code> and <code>docker rm bdma-redis</code> to clean up.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>redis-cli</code> <code>redis-cli -h host -p 6379 -a password</code>
+      <div class="cmd-desc">Open the shell. <code>PING</code> should answer <code>PONG</code>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SET dash:total:bookings 15000</code> <code>GET dash:total:bookings</code>
+      <div class="cmd-desc">Set and read a string. <strong>Colon-delimited key names are the schema</strong> — Redis enforces nothing, so the convention is all you have.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>INCR dash:total:bookings</code> <code>INCRBY dash:status:Completed 5</code>
+      <div class="cmd-desc">Atomic counters. Safe under concurrency without a transaction — this is the core of compute-on-write.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>INCRBYFLOAT dash:revenue:2024-03-14 412.50</code>
+      <div class="cmd-desc">Accumulate a money total. Redis stores it as a string and parses on each call.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>MGET dash:status:Completed dash:status:Incomplete</code>
+      <div class="cmd-desc">Read many keys in one round trip. The difference between one network hop and twenty.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>EXPIRE dash:session:abc 3600</code> <code>TTL dash:session:abc</code>
+      <div class="cmd-desc">Set and inspect a time-to-live in seconds. <code>TTL</code> returns <code>-1</code> for no expiry, <code>-2</code> if the key is gone.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SETEX cache:report 300 "{...}"</code>
+      <div class="cmd-desc">Set with an expiry in one atomic command — the standard cache write.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SCAN 0 MATCH "dash:*" COUNT 100</code>
+      <div class="cmd-desc"><strong>Use this, never <code>KEYS *</code>.</strong> <code>KEYS</code> blocks the single-threaded server across the whole keyspace; <code>SCAN</code> iterates in cursored batches.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>DEL key</code> <code>EXISTS key</code> <code>TYPE key</code>
+      <div class="cmd-desc">Delete, test and inspect. <code>TYPE</code> is how you find out that a key you thought was a string is actually a hash.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>FLUSHDB</code>
+      <div class="cmd-desc">Wipe the current database. Fine on your laptop, catastrophic anywhere else.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Redis — Hashes, Lists &amp; Sets</h3>
+
+    <div class="cmd-row">
+      <code>HSET dash:payment UPI 4613 Cash 2593</code> <code>HGETALL dash:payment</code>
+      <div class="cmd-desc">A <strong>hash</strong> stores an object's fields under one key. Ideal for the payment-method breakdown.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>HINCRBY dash:payment UPI 1</code>
+      <div class="cmd-desc">Increment a single field without reading the hash first.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>LPUSH rides:recent "CNR3000142"</code> <code>LRANGE rides:recent 0 9</code>
+      <div class="cmd-desc">A <strong>list</strong> as a recent-activity feed. Pair with <code>LTRIM rides:recent 0 99</code> to cap it at 100 entries.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SADD rides:customers:2024-03-14 "CID482910"</code> <code>SCARD rides:customers:2024-03-14</code>
+      <div class="cmd-desc">A <strong>set</strong> of unique members and its exact cardinality. Exact, but memory grows with every distinct member.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SINTER rides:customers:2024-03-14 rides:customers:2024-03-15</code>
+      <div class="cmd-desc">Set intersection — customers who rode on both days. <code>SUNION</code> and <code>SDIFF</code> complete the algebra.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Redis — Sorted Sets, Bitmaps &amp; HyperLogLog</h3>
+
+    <div class="cmd-row">
+      <code>ZADD dash:vehicle:revenue 536854 "Premier Sedan"</code>
+      <div class="cmd-desc">A <strong>sorted set</strong> keeps members ordered by score. This is the structure with no clean SQL equivalent.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>ZINCRBY dash:vehicle:revenue 412.5 "Go Sedan"</code>
+      <div class="cmd-desc">Add to a member's score, creating it at zero if absent. One command per booking keeps a live leaderboard.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>ZREVRANGE dash:vehicle:revenue 0 4 WITHSCORES</code>
+      <div class="cmd-desc"><strong>Top 5, instantly.</strong> No sort at read time — the structure is already ordered.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>ZRANK dash:vehicle:revenue "Uber XL"</code> <code>ZSCORE dash:vehicle:revenue "Uber XL"</code>
+      <div class="cmd-desc">Position in the ranking and the raw score behind it.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>SETBIT dash:actives:2024-03-14 482910 1</code>
+      <div class="cmd-desc"><strong>Bitmap.</strong> One bit per user id. Tracking a million users costs ~125 KB — 1,000,000 bits ÷ 8.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>BITCOUNT dash:actives:2024-03-14</code>
+      <div class="cmd-desc">Count the set bits — daily active users, in one command.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>BITOP AND dash:retained dash:actives:2024-03-14 dash:actives:2024-03-15</code>
+      <div class="cmd-desc"><strong>Retention in two commands.</strong> <code>AND</code> the two days, then <code>BITCOUNT</code> the result. <code>OR</code>, <code>XOR</code> and <code>NOT</code> are also available.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>PFADD dash:uniques:2024-03-14 "CID482910"</code> <code>PFCOUNT dash:uniques:2024-03-14</code>
+      <div class="cmd-desc"><strong>HyperLogLog.</strong> Approximate unique counts in a fixed 12 KB with ~0.81% error. You cannot list the members back.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>PFMERGE dash:uniques:week dash:uniques:2024-03-14 dash:uniques:2024-03-15</code>
+      <div class="cmd-desc">Merge HyperLogLogs into a weekly rollup without double-counting.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Redis — Transactions, Pipelines &amp; Operations</h3>
+
+    <div class="cmd-row">
+      <code>MULTI</code> … <code>EXEC</code>
+      <div class="cmd-desc">Queue commands and run them as one atomic unit. <code>DISCARD</code> abandons the queue.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>WATCH key</code>
+      <div class="cmd-desc">Optimistic locking — the following <code>EXEC</code> fails if the watched key changed in the meantime.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>INFO memory</code> <code>INFO stats</code>
+      <div class="cmd-desc">Server introspection. <code>used_memory_human</code> and <code>keyspace_hits</code> vs <code>keyspace_misses</code> are the two numbers that matter for a cache.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>MEMORY USAGE dash:actives:2024-03-14</code>
+      <div class="cmd-desc">Bytes consumed by one key. Use it to prove the bitmap memory claim rather than asserting it.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>CONFIG SET maxmemory-policy allkeys-lru</code>
+      <div class="cmd-desc"><strong>Eviction policy.</strong> <code>allkeys-lru</code> for a cache, <code>volatile-lru</code> to evict only keys with a TTL, <code>noeviction</code> to fail writes instead of dropping data.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>BGSAVE</code> <code>LASTSAVE</code>
+      <div class="cmd-desc">Trigger a background RDB snapshot and check when the last one completed. AOF is the lower-loss alternative, at a write-throughput cost.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>MONITOR</code>
+      <div class="cmd-desc">Stream every command hitting the server. Superb for debugging, and a serious performance hit — development only.</div>
+    </div>
+  </div>
+
+  <div class="cmd-group">
+    <h3>Node.js Clients</h3>
+
+    <div class="cmd-row">
+      <code>npm install mongodb redis</code>
+      <div class="cmd-desc">The two official drivers used in the Lecture 18 dashboard project.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>const client = new MongoClient(uri); await client.connect();</code>
+      <div class="cmd-desc">Connect once at start-up and reuse — the driver pools connections internally. Creating a client per request is the classic mistake.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>await db.collection("rides").aggregate(pipeline).toArray()</code>
+      <div class="cmd-desc">Run a pipeline from Node. The array you pass is identical to the one you tested in <code>mongosh</code>.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>const redis = createClient({ url: "redis://localhost:6379" }); await redis.connect();</code>
+      <div class="cmd-desc">Connect the Redis client. Every command returns a promise.</div>
+    </div>
+
+    <div class="cmd-row">
+      <code>await redis.multi().incr("dash:total:bookings").hIncrBy("dash:payment", "UPI", 1).exec()</code>
+      <div class="cmd-desc">Chain updates into one atomic round trip — the shape of the Lecture 18 booking writer.</div>
+    </div>
+  </div>
+
+  <div class="cmd-empty" id="cmdEmpty" style="display:none">No commands match that filter. Press <kbd>Esc</kbd> to clear.</div>
+
+  <div class="callout amber">
+    <p><strong>A note on destructive commands.</strong> <code>db.rides.drop()</code>, <code>deleteMany({})</code> and <code>FLUSHDB</code> appear here because you will need them to reset your lab environment. Build the habit now of running the matching <code>countDocuments()</code> or <code>SCAN</code> first, so that in three years' time you do not run one against production.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="index.html">← Course Home</a>
+    <span class="spacer"></span>
+    <a href="assignments.html">Assignments</a>
+    <a href="dashboard/index.html">Dashboard →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="index.html">Course Home</a> &nbsp;·&nbsp; <a href="assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+
+<script src="assets/js/commands.js"></script>
+</body>
+</html>

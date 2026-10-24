@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 15 — Atlas Charts &amp; the Ride-Analytics Problem | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 15 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 3</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 3 · Lecture 15</div>
+  <h1>Atlas Charts &amp; the Ride-Analytics Problem</h1>
+  <p class="subtitle">Thirty-seven percent of bookings never carry a passenger. Today we build the dashboard that finds out why.</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO4</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 14 (aggregation pipelines)</span>
+    <span>🔧 <strong>Lab:</strong> MongoDB Atlas Charts</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#brief">Section 1: The Brief — A Real Business Problem</a></li>
+      <li><a href="#whycharts">Section 2: Why Atlas Charts Rather Than Excel</a></li>
+      <li><a href="#model">Section 3: Charts' Mental Model — Sources, Encodings, Filters</a></li>
+      <li><a href="#build">Section 4: Building the First Four Charts</a></li>
+      <li><a href="#choosing">Section 5: Choosing the Right Chart Type</a></li>
+      <li><a href="#traps">Section 6: Three Traps That Produce Confident Nonsense</a></li>
+      <li><a href="#lab">Section 7: Hands-On — Build the Dashboard</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> State a business problem in a form that a dashboard can actually answer</li>
+    <li><span class="check">✓</span> Connect Atlas Charts to a collection and build a chart without writing a query</li>
+    <li><span class="check">✓</span> Explain the relationship between a Charts encoding channel and a <code>$group</code> stage</li>
+    <li><span class="check">✓</span> Choose a chart type from the question being asked rather than from habit</li>
+    <li><span class="check">✓</span> Use a query filter and an aggregation pipeline inside a chart's data source</li>
+    <li><span class="check">✓</span> Recognise the small-sample, missing-field and truncated-axis traps before they reach a slide</li>
+    <li><span class="check">✓</span> Assemble four charts into a dashboard that answers one coherent question</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Time</th><th>Segment</th><th>What Happens</th></tr></thead>
+      <tbody>
+        <tr><td>0–10 min</td><td>The brief</td><td>The ops director's question, and what 37.71% actually costs</td></tr>
+        <tr><td>10–20 min</td><td>Why Charts</td><td>Live data vs extract; where Charts sits against Excel, Tableau and Power BI</td></tr>
+        <tr><td>20–32 min</td><td>The mental model</td><td>Data sources, encoding channels, and how they map to aggregation stages</td></tr>
+        <tr><td>32–50 min</td><td>Build along — charts 1 &amp; 2</td><td>Status mix and revenue by vehicle type</td></tr>
+        <tr><td>50–62 min</td><td>Build along — charts 3 &amp; 4</td><td>Demand by hour, and the cancellation-reason breakdown</td></tr>
+        <tr><td>62–72 min</td><td>Chart choice</td><td>Matching chart type to question; the four that are almost always wrong</td></tr>
+        <tr><td>72–84 min</td><td>Traps</td><td>Small samples, missing fields, truncated axes — with live examples from this data</td></tr>
+        <tr><td>84–90 min</td><td>Wrap</td><td>Assemble the dashboard; set up for the Lecture 16 deep-dive</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="brief">Section 1: The Brief — A Real Business Problem</h2>
+
+  <p>For four lectures you have been running queries against <code>bdma.rides</code> because they were on a worksheet. Today the worksheet is replaced by a person.</p>
+
+  <div class="callout">
+    <p><strong>The brief.</strong> You are three weeks into a role at a ride-hailing operator in Delhi NCR. The operations director stops you after a meeting and says: <em>&ldquo;Our completion rate is sitting around sixty percent and finance thinks we're leaving money on the table. Nobody can tell me where it's going. You have the data. I have a board meeting on Friday — give me somewhere to start.&rdquo;</em></p>
+  </div>
+
+  <p>That is a real brief, and it is typical in exactly the way that matters: it names a symptom, not a question. Before you open any tool, the first job is to convert it into something answerable.</p>
+
+  <h3>From a complaint to a question</h3>
+
+  <p>&ldquo;Where is the money going?&rdquo; cannot be plotted. Decompose it until each piece can be:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Question</th><th>Shape of the answer</th><th>Chart that answers it</th></tr></thead>
+      <tbody>
+        <tr><td>How do bookings actually end?</td><td>A breakdown of one categorical field</td><td>Donut or bar</td></tr>
+        <tr><td>Which failures are most common?</td><td>A ranked list within one category</td><td>Horizontal bar</td></tr>
+        <tr><td>Does failure depend on time of day?</td><td>A measure across an ordered dimension</td><td>Column + line combo</td></tr>
+        <tr><td>Which products carry the value?</td><td>A ranked measure by category</td><td>Horizontal bar</td></tr>
+        <tr><td>Where does it happen?</td><td>A ranked list with a secondary rate</td><td>Table or bar</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Each row of that table becomes one chart. Nothing else gets built. This discipline — <strong>no chart without a question written down first</strong> — is the single most useful habit in this module, and it is also the first thing the project rubric checks.</p>
+
+  <h3>Sizing the problem before you start</h3>
+
+  <p>Begin by establishing the magnitude, because it determines how much effort the problem deserves. From the aggregations you wrote in Lecture 14:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Measure</th><th>Value</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td>Total bookings (2024)</td><td>15,000</td><td>The denominator for everything below</td></tr>
+        <tr><td>Completed</td><td>9,343 (62.29%)</td><td>Only these earn revenue</td></tr>
+        <tr><td>Failed</td><td>5,657 (37.71%)</td><td>The problem, quantified</td></tr>
+        <tr><td>Revenue realised</td><td>₹22,02,449</td><td>What the operation actually earned</td></tr>
+        <tr><td>Average completed fare</td><td>₹235.73</td><td>The multiplier for lost bookings</td></tr>
+        <tr><td><strong>Estimated lost revenue</strong></td><td><strong>₹13,33,539</strong></td><td>5,657 × ₹235.73 — the headline number</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Be honest about what &ldquo;lost revenue&rdquo; means.</strong> ₹13,33,539 assumes every failed booking would have completed at the average fare. It would not have. Some customers rebooked successfully within minutes and are already counted in the 9,343. Some trips would have been short and cheap. The number is an <strong>upper bound</strong>, and you must say so out loud — because the first thing a competent CFO will do is attack it. A defended upper bound survives that attack; an undefended point estimate does not.</p>
+  </div>
+
+  <p>Even halved, the figure is roughly ₹6.7 lakh against ₹22 lakh of realised revenue. That is large enough to justify the work. Establishing this in the first five minutes is what separates an analysis from a hobby.</p>
+
+  <h2 id="whycharts">Section 2: Why Atlas Charts Rather Than Excel</h2>
+
+  <p>You could export a CSV and build this in Excel in an afternoon. Many analysts would. It is worth being precise about what you lose when you do.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Dimension</th><th>CSV → Excel</th><th>Atlas Charts</th></tr></thead>
+      <tbody>
+        <tr><td>Freshness</td><td>Frozen at export. Someone must remember to redo it.</td><td>Queries the live collection on each load</td></tr>
+        <tr><td>Nested data</td><td><code>route.pickup</code> must be flattened by hand first</td><td>Dot notation works natively</td></tr>
+        <tr><td>Size ceiling</td><td>About a million rows, and painful well before that</td><td>Aggregation runs server-side; the browser receives results only</td></tr>
+        <tr><td>Reproducibility</td><td>Manual steps live in one person's memory</td><td>The chart <em>is</em> the specification</td></tr>
+        <tr><td>Sharing</td><td>Email a file; now there are nine versions</td><td>One URL, access controlled</td></tr>
+        <tr><td>Ad-hoc exploration</td><td>Excellent — genuinely better than Charts</td><td>Fine, but more structured</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The honest summary.</strong> Excel is better for exploring something once. Charts is better for anything that must stay true next month. The failure mode we are designing against is not &ldquo;Excel is bad&rdquo; — it is the quarterly report that silently reflects data from March.</p>
+  </div>
+
+  <h3>Where Charts sits in the wider market</h3>
+
+  <p>Atlas Charts is not competing with Tableau or Power BI on features, and you should not present it as though it were. It wins on exactly one axis: it is already connected to your data.</p>
+
+  <ul>
+    <li><strong>Tableau / Power BI</strong> — far richer visual grammar, modelling layers, enterprise governance. They also need a connector, an extract schedule, a licence per seat, and someone to own all three.</li>
+    <li><strong>Atlas Charts</strong> — included with the Atlas cluster, no connector, no extract, handles nested documents natively. Weaker at complex blending across many sources.</li>
+    <li><strong>A hand-built dashboard</strong> (what the <a href="../dashboard/index.html">course dashboard</a> is) — total control, no licence, and you own every bug forever.</li>
+  </ul>
+
+  <p>For a team already on Atlas that needs an operational dashboard this week, Charts is usually the right call. For a finance function blending ERP, CRM and warehouse data, it is not. Saying which situation you are in is the analysis; the tool follows.</p>
+
+  <h2 id="model">Section 3: Charts' Mental Model — Sources, Encodings, Filters</h2>
+
+  <p>Atlas Charts has three concepts. Once they click, the interface stops being a maze.</p>
+
+  <h3>1. The data source</h3>
+
+  <p>A data source is a collection, a view, or a collection with a pipeline attached. It is defined once in <strong>Charts → Data Sources</strong> and reused by every chart that needs it.</p>
+
+  <p>The important option is the one people miss: a data source can carry its own <strong>aggregation pipeline</strong>. Everything you learned in Lecture 14 is available here. If a chart needs a derived field — booking hour, say — you do not fight the chart builder. You attach a pipeline to the source and the field simply exists:</p>
+
+  <pre><code>[
+  { $addFields: {
+      hour: { $toInt: { $substr: ["$booked_at", 11, 2] } },
+      failed: { $cond: [{ $eq: ["$status", "Completed"] }, 0, 1] }
+  } }
+]</code></pre>
+
+  <p>Two lines, and every chart built on that source can now encode by hour or average the failure flag. Recall from Lecture 12 that <code>booked_at</code> is stored as an ISO <em>string</em> in this dataset, which is why we slice characters 11–12 rather than calling <code>$hour</code>. If you prefer the date operators, convert first with <code>{ $toDate: "$booked_at" }</code>.</p>
+
+  <div class="callout blue">
+    <p><strong>Push work into the source, not the chart.</strong> A derived field defined once in the source stays consistent across every chart on the dashboard. The same expression pasted into six charts will diverge the first time someone edits five of them.</p>
+  </div>
+
+  <h3>2. Encoding channels</h3>
+
+  <p>A chart in Charts is built by dragging fields onto <strong>channels</strong>. Each channel is a visual property, and each one maps directly onto something you already know how to write by hand:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Channel</th><th>Visual role</th><th>Aggregation equivalent</th></tr></thead>
+      <tbody>
+        <tr><td><strong>X / Category</strong></td><td>What the bars or slices are</td><td>The <code>_id</code> of a <code>$group</code></td></tr>
+        <tr><td><strong>Y / Value</strong></td><td>How tall or large each one is</td><td>The accumulator — <code>$sum</code>, <code>$avg</code>, <code>$count</code></td></tr>
+        <tr><td><strong>Series / Colour</strong></td><td>Splits each category into sub-bars</td><td>A compound <code>_id</code> with two keys</td></tr>
+        <tr><td><strong>Filter</strong></td><td>Which documents are considered</td><td><code>$match</code>, placed first</td></tr>
+        <tr><td><strong>Sort &amp; limit</strong></td><td>Ranking and top-N</td><td><code>$sort</code> then <code>$limit</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>This equivalence is the point of teaching aggregation before visualisation. Charts is a graphical front end to a pipeline. When a chart shows a number you did not expect, you debug it by asking <em>what pipeline would produce this?</em> — and then you go and run that pipeline in <code>mongosh</code> to check.</p>
+
+  <h3>3. Filters</h3>
+
+  <p>Filters exist at three levels, and knowing which one you used matters more than it sounds:</p>
+
+  <ul>
+    <li><strong>Source-level</strong> — a <code>$match</code> in the source pipeline. Applies everywhere, invisible on the chart.</li>
+    <li><strong>Chart-level</strong> — set in the chart's own filter panel. Applies to that chart only.</li>
+    <li><strong>Dashboard-level</strong> — an interactive control the viewer manipulates. Applies to every chart bound to that field.</li>
+  </ul>
+
+  <div class="callout amber">
+    <p><strong>An undisclosed filter is how dashboards lie.</strong> A chart titled &ldquo;Average Booking Value&rdquo; that quietly filters to <code>status: "Completed"</code> is not wrong — ₹235.73 is the correct average for completed rides — but a reader who assumes it covers all 15,000 bookings has been misled. Put the filter in the title: <strong>&ldquo;Average Booking Value (Completed Rides Only)&rdquo;</strong>. This is marked in both Assignment 3 and the project rubric.</p>
+  </div>
+
+  <h2 id="build">Section 4: Building the First Four Charts</h2>
+
+  <p>Build these along with the lecturer. Each one states its question first, then its configuration, then the answer it gives.</p>
+
+  <h3>Chart 1 — How do bookings actually end?</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>Type:</strong> Donut. <strong>Label:</strong> <code>status</code>. <strong>Arc:</strong> <code>COUNT</code>.</p>
+      <p>Five categories, parts of a whole, and the whole is meaningful. This is one of the few cases where a donut genuinely beats a bar chart — the reader's question is &ldquo;what share?&rdquo;, not &ldquo;which is bigger?&rdquo;.</p>
+    </div>
+  </div>
+
+  <p>The result, which should match your Lecture 14 pipeline exactly:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Status</th><th>Bookings</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Completed</td><td>9,343</td><td>62.29%</td></tr>
+        <tr><td>Cancelled by Driver</td><td>2,698</td><td>17.99%</td></tr>
+        <tr><td>No Driver Found</td><td>1,036</td><td>6.91%</td></tr>
+        <tr><td>Cancelled by Customer</td><td>1,022</td><td>6.81%</td></tr>
+        <tr><td>Incomplete</td><td>901</td><td>6.01%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>What it tells you immediately:</strong> driver cancellations are 17.99% — more than two and a half times customer cancellations at 6.81%. Add &ldquo;No Driver Found&rdquo; at 6.91% and roughly <strong>25% of all bookings fail on the supply side</strong>. That single comparison reframes the brief: this is not customers changing their minds, it is the operator failing to deliver a car. Every subsequent chart should be chosen to test that hypothesis.</p>
+
+  <h3>Chart 2 — Which products carry the value?</h3>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>Type:</strong> Horizontal bar. <strong>Y:</strong> <code>vehicle_type</code>. <strong>X:</strong> <code>SUM</code> of <code>booking_value</code>. <strong>Sort:</strong> descending.</p>
+      <p>Horizontal, not vertical, because the category labels are words — &ldquo;Premier Sedan&rdquo; reads cleanly on a horizontal axis and becomes a rotated mess on a vertical one.</p>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Vehicle type</th><th>Revenue</th><th>Bookings</th><th>Avg fare</th><th>Completion</th></tr></thead>
+      <tbody>
+        <tr><td>Premier Sedan</td><td>₹5,36,855</td><td>1,954</td><td>₹442.22</td><td>62.13%</td></tr>
+        <tr><td>Go Sedan</td><td>₹4,91,473</td><td>2,854</td><td>₹278.77</td><td>61.77%</td></tr>
+        <tr><td>Uber XL</td><td>₹4,31,927</td><td>1,231</td><td>₹558.77</td><td>62.79%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>The insight hiding in the ordering:</strong> Premier Sedan earns the most revenue from only 1,954 bookings, while Go Sedan takes 2,854 bookings to earn less. Uber XL earns ₹4.3 lakh from 1,231 bookings. <strong>Ranking by volume and ranking by revenue give different answers</strong> — and a failed Uber XL booking costs ₹558.77 against ₹278.77 for a Go Sedan. If you can only fix cancellations for one product, the arithmetic says start where each failure is most expensive, not where failures are most numerous.</p>
+
+  <div class="callout blue">
+    <p><strong>A dashboard that only ever counts things will mislead you.</strong> Count answers &ldquo;how often&rdquo;. Value answers &ldquo;how much&rdquo;. They rank differently, and the decision almost always follows value.</p>
+  </div>
+
+  <h3>Chart 3 — Does failure depend on the time of day?</h3>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>Type:</strong> Column chart with a line series. <strong>X:</strong> <code>hour</code> (the field derived in the source pipeline). <strong>Y (columns):</strong> <code>COUNT</code>. <strong>Y (line):</strong> <code>MEAN</code> of <code>failed</code>, formatted as a percentage.</p>
+      <p>Two measures on different scales against a shared ordered dimension. Volume as columns, rate as a line, and the line gets its own axis.</p>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Hour</th><th>Bookings</th><th>Failure rate</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>18:00</td><td>1,373</td><td>37.14%</td><td>Busiest hour of the day</td></tr>
+        <tr><td>19:00</td><td>1,246</td><td>—</td><td>Evening peak continues</td></tr>
+        <tr><td>09:00</td><td>1,172</td><td>—</td><td>Morning commute</td></tr>
+        <tr><td>08:00</td><td>1,076</td><td>—</td><td>Morning commute</td></tr>
+        <tr><td><strong>17:00</strong></td><td><strong>1,062</strong></td><td><strong>39.92%</strong></td><td><strong>Worst failure rate of any high-volume hour</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>This is the finding of the session.</strong> The busiest hour is 18:00, and the instinct of every operations team is to throw resources at the peak. But 17:00 — one hour <em>earlier</em>, still carrying 1,062 bookings — fails at 39.92% against the peak's 37.14%. Supply is thinnest just <em>before</em> demand peaks, not during it. Drivers have not yet repositioned for the evening rush.</p>
+
+  <div class="callout green">
+    <p><strong>Volume is not risk.</strong> The hour with the most bookings is not the hour with the most problems. A dashboard that plots only volume would have sent the operations director to 18:00 and the intervention would have underperformed. This is precisely the kind of finding that justifies building the dashboard at all.</p>
+  </div>
+
+  <h3>Chart 4 — Which failures are most common?</h3>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p><strong>Type:</strong> Horizontal bar. <strong>Y:</strong> <code>cancellation.reason</code>. <strong>X:</strong> <code>COUNT</code>. <strong>Filter:</strong> <code>cancellation.by = "driver"</code>.</p>
+      <p>Note the dot notation on a nested field — no flattening step, which is exactly the advantage Charts has over a CSV export.</p>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Driver cancellation reason</th><th>Count</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Customer related issue</td><td>729</td><td>27.02%</td></tr>
+        <tr><td>More than permitted people in there</td><td>666</td><td>24.68%</td></tr>
+        <tr><td>Personal &amp; Car related issues</td><td>652</td><td>24.17%</td></tr>
+        <tr><td>The customer was coughing/sick</td><td>651</td><td>24.13%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>A genuinely awkward result.</strong> Four reasons, all between 24% and 27%. There is no dominant cause. This is worth sitting with, because the temptation is to pick the top bar and call it the answer — but a 27% leader among four near-equal options is not a finding, it is a flat distribution.</p>
+
+  <p>The honest read: there is no single fix available. Either you attack all four, or you accept that the reason codes themselves are too coarse to act on and recommend better instrumentation. <strong>&ldquo;The data cannot answer this; here is what we would need to collect&rdquo; is a legitimate and often valuable recommendation.</strong> We develop it properly in Lecture 16.</p>
+
+  <h2 id="choosing">Section 5: Choosing the Right Chart Type</h2>
+
+  <p>Chart choice is not aesthetic. Each type encodes a specific relationship, and using the wrong one makes the reader work to undo your encoding.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>The question</th><th>Use</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td>Which is biggest?</td><td>Bar (horizontal if labels are words)</td><td>Length on a common baseline is the most accurately judged visual channel</td></tr>
+        <tr><td>What share of the whole?</td><td>Donut — with at most 5–6 slices</td><td>Angle reads share directly; beyond six slices it becomes unreadable</td></tr>
+        <tr><td>How does it move over time?</td><td>Line</td><td>Slope encodes rate of change, which the eye reads instantly</td></tr>
+        <tr><td>Two measures, one dimension?</td><td>Combo column + line, dual axis</td><td>Keeps different units on their own scales</td></tr>
+        <tr><td>Exact values matter?</td><td>Table</td><td>When the reader will quote the number, do not make them estimate it</td></tr>
+        <tr><td>Where, geographically?</td><td>Map</td><td>Only when position itself carries meaning</td></tr>
+        <tr><td>Density across two dimensions?</td><td>Heatmap</td><td>Hour × day-of-week demand is the canonical case</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Four choices that are almost always wrong</h3>
+
+  <ul>
+    <li><strong>A pie chart with twelve slices.</strong> Nobody can rank slices 7 through 12. Use a sorted bar chart.</li>
+    <li><strong>A 3D anything.</strong> Perspective distorts the lengths and areas the reader is trying to compare. There is no situation in this course where 3D is the right answer.</li>
+    <li><strong>A line chart over an unordered category.</strong> A line between &ldquo;Go Sedan&rdquo; and &ldquo;Uber XL&rdquo; implies a progression that does not exist. Lines are for ordered dimensions only.</li>
+    <li><strong>A dual axis chosen to make two lines cross.</strong> Dual axes are legitimate for genuinely different units. Scaling them until the lines intersect at a dramatic point is a rhetorical trick, and an informed audience will catch it.</li>
+  </ul>
+
+  <h2 id="traps">Section 6: Three Traps That Produce Confident Nonsense</h2>
+
+  <p>Each of these is live in the course dataset right now. They are not hypothetical.</p>
+
+  <h3>Trap 1 — The small-sample rate</h3>
+
+  <p>Sort the hourly failure rates from Chart 3 by rate instead of by hour, and the top of the list is not 17:00. It is <strong>03:00, at 43.48%</strong>.</p>
+
+  <div class="callout amber">
+    <p><strong>03:00 carries 46 bookings.</strong> Twenty of them failed. One more cancellation moves that rate by more than two percentage points. It is noise wearing the costume of a finding — and a dashboard that ranks purely by rate will send the operations director to staff the night shift.</p>
+  </div>
+
+  <p>The fix is a volume floor, applied in the source pipeline after the grouping stage:</p>
+
+  <pre><code>{ $group: {
+    _id: "$hour",
+    bookings: { $sum: 1 },
+    failed:   { $sum: { $cond: [{ $eq: ["$status", "Completed"] }, 0, 1] } }
+} },
+{ $match: { bookings: { $gte: 1000 } } },
+{ $addFields: {
+    failure_rate: { $round: [{ $multiply: [{ $divide: ["$failed", "$bookings"] }, 100] }, 2] }
+} },
+{ $sort: { failure_rate: -1 } }</code></pre>
+
+  <p>Now 17:00 tops the list legitimately. The threshold of 1,000 is a judgement call, not a law — but you must state it and be able to defend it. &ldquo;We excluded hours below 1,000 bookings because rates below that are unstable&rdquo; is a defensible sentence. Silently excluding them is not.</p>
+
+  <h3>Trap 2 — Averaging over absent fields</h3>
+
+  <p>Recall from Lecture 12 that <code>booking_value</code> is <strong>absent</strong> on cancelled and no-driver-found bookings. MongoDB's <code>$avg</code> skips missing fields silently — it does not treat them as zero, and it does not warn you.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>What you built</th><th>What it computes</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>$avg</code> over all 15,000 documents</td><td>Mean over the ~10,244 that have the field</td><td>Looks like a fleet average, is not</td></tr>
+        <tr><td><code>$avg</code> after <code>$match: { status: "Completed" }</code></td><td>Mean over exactly 9,343 completed rides</td><td><strong>₹235.73</strong> — defensible</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Both produce a plausible-looking number. Only the second has a definition you can state in one sentence. <strong>Filter explicitly to the population you mean, and name that population in the chart title.</strong></p>
+
+  <h3>Trap 3 — The truncated axis</h3>
+
+  <p>Completion rates by vehicle type run from 61.77% to 62.79% — a spread of one percentage point across the fleet. Plot that on an axis from 61% to 63% and Uber XL's bar towers over Go Sedan's. The chart is technically accurate and completely misleading.</p>
+
+  <p>Start value axes at zero. The honest conclusion here is that <strong>completion rate barely varies by vehicle type</strong>, which is itself informative: the failure problem is not product-specific, so a product-specific fix will not work. A truncated axis would have hidden that conclusion behind a dramatic-looking bar chart.</p>
+
+  <div class="callout blue">
+    <p><strong>The common thread.</strong> All three traps produce charts that are defensible line by line and wrong as a whole. The defence is the same in each case: state the population, state the threshold, start at zero, and sanity-check every chart against a pipeline you ran by hand in <code>mongosh</code>.</p>
+  </div>
+
+  <h2 id="lab">Section 7: Hands-On — Build the Dashboard</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>Open Charts.</strong> In Atlas, select your project and click <strong>Charts</strong> in the left sidebar. On first use it provisions automatically — no separate signup.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>Add the data source.</strong> Go to <strong>Data Sources → Add Data Source</strong>, pick your cluster, and select <code>bdma.rides</code>. Confirm it reports 15,000 documents. If it does not, re-run the <code>mongoimport</code> from Lecture 12 before continuing.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>Attach the pipeline.</strong> Open the source's options, choose <strong>Pipeline</strong>, and paste the <code>$addFields</code> stage from Section 3. Save. The fields <code>hour</code> and <code>failed</code> now appear in the field list of every chart built on this source.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p><strong>Create the dashboard.</strong> <strong>Dashboards → Add Dashboard</strong>. Name it <code>Ride Operations — Failure Analysis</code>. A name that states the subject beats &ldquo;Dashboard 1&rdquo; the moment a second dashboard exists.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <p><strong>Build the four charts</strong> from Section 4, in order. After each one, verify the number against the corresponding <code>mongosh</code> pipeline from Lecture 14. If the chart and the shell disagree, the chart has a filter you forgot about — find it before you build the next chart.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <p><strong>Title every chart with its question.</strong> Not &ldquo;Status&rdquo; but <strong>&ldquo;How do bookings end? (All 15,000 bookings, 2024)&rdquo;</strong>. The title carries the question and the population; the chart carries the answer.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body">
+      <p><strong>Arrange for reading order.</strong> Top-left is read first, so put the status donut there — it frames everything else. Hourly failure goes top-right. Revenue and cancellation reasons go below. Readers scan in a Z; lay the argument out along it.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body">
+      <p><strong>Compare against the reference.</strong> Open the <a href="../dashboard/index.html">course dashboard</a> alongside yours. Every number should match exactly — the dataset is seeded, so there is no room for &ldquo;close enough&rdquo;. A mismatch is a bug in your filter, and finding it now is the whole point of the exercise.</p>
+    </div>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>No chart without a written question.</strong> The question determines the chart type, the filter and the title. A chart built because the data was available is decoration.</li>
+      <li><strong>Charts is a graphical front end to the aggregation framework.</strong> Category is <code>$group._id</code>, value is the accumulator, filter is <code>$match</code>. Debug a wrong chart by writing the pipeline it implies and running it.</li>
+      <li><strong>Push derived fields into the data source pipeline.</strong> Defined once, consistent everywhere, and the chart builder stops fighting you.</li>
+      <li><strong>Volume is not risk.</strong> 18:00 is the busiest hour at 1,373 bookings; 17:00 fails more often at 39.92%. Plotting only volume would have aimed the fix at the wrong hour.</li>
+      <li><strong>Count and value rank differently.</strong> Go Sedan has the most bookings; Premier Sedan earns the most revenue. The decision follows value.</li>
+      <li><strong>Always name the population and the threshold.</strong> A 43.48% failure rate on 46 bookings is noise; an undisclosed <code>status: "Completed"</code> filter turns a correct average into a misleading one.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 16 — Dashboard Storytelling &amp; the Recommendation</h3>
+    <p>Four charts and a finding are not yet an answer. Next session we take the 17:00 insight apart, work out what the flat cancellation-reason distribution really means, and turn the dashboard into the one-page recommendation the operations director asked for on Friday. Bring the dashboard you built today — we edit it live.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture14/notes.html">← Lecture 14</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture16/notes.html">Lecture 16 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

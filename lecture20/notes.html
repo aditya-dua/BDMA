@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 20 — Project Presentations II &amp; Course Wrap-Up | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 20 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 5</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 5 · Lecture 20</div>
+  <h1>Project Presentations II &amp; Course Wrap-Up</h1>
+  <p class="subtitle">The remaining teams present — then the whole arc pulled into one portable decision framework</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎤 <strong>5 teams · 10 min + 3 min Q&amp;A</strong></span>
+    <span>🧭 <strong>Synthesis:</strong> Lectures 11–18 in one framework</span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 19 (brief, rubric, run sheet)</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#runsheet">Run Sheet for the Remaining Teams</a></li>
+      <li><a href="#arc">The Arc of the Course</a></li>
+      <li><a href="#framework">The Decision Framework — The Most Portable Asset</a></li>
+      <li><a href="#computetrade">Compute-on-Read vs Compute-on-Write</a></li>
+      <li><a href="#polyglot">Polyglot Persistence — The Mature Answer</a></li>
+      <li><a href="#capabilities">What You Can Now Do</a></li>
+      <li><a href="#next">Where to Go Next</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Present and defend a complete data project inside a thirteen-minute slot</li>
+    <li><span class="check">✓</span> Map each database family covered to the class of business question it answers best</li>
+    <li><span class="check">✓</span> Apply the five-question decision framework to a technology choice you have not seen before</li>
+    <li><span class="check">✓</span> Articulate the compute-on-read versus compute-on-write trade and say which a given workload needs</li>
+    <li><span class="check">✓</span> Justify a polyglot architecture — and recognise when it is complexity for its own sake</li>
+    <li><span class="check">✓</span> Audit your own capability honestly against a concrete list of things a data-literate manager can do</li>
+    <li><span class="check">✓</span> Choose a credible next step: a certification, a deeper skill, or the current frontier</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <p>Continuing the worked example of a <strong>ten-team cohort</strong>: teams 6–10 present today. Slots are shorter than in Lecture 19 — thirteen minutes rather than seventeen — because the final twenty-three minutes belong to the synthesis. The lecturer adjusts slot length to the actual cohort size.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–2 min</td><td>Opening</td><td>Timing change announced; peer forms distributed</td></tr>
+      <tr><td>2–15 min</td><td>Team 6</td><td>10 min presentation + 3 min Q&amp;A</td></tr>
+      <tr><td>15–28 min</td><td>Team 7</td><td>10 min presentation + 3 min Q&amp;A</td></tr>
+      <tr><td>28–41 min</td><td>Team 8</td><td>10 min presentation + 3 min Q&amp;A</td></tr>
+      <tr><td>41–54 min</td><td>Team 9</td><td>10 min presentation + 3 min Q&amp;A</td></tr>
+      <tr><td>54–67 min</td><td>Team 10</td><td>10 min presentation + 3 min Q&amp;A</td></tr>
+      <tr><td>67–72 min</td><td>Cross-Team Debrief</td><td>Patterns across all ten projects: what worked, what repeated</td></tr>
+      <tr><td>72–84 min</td><td>Course Synthesis</td><td>Families, the decision framework, compute-on-read vs compute-on-write, polyglot persistence</td></tr>
+      <tr><td>84–90 min</td><td>Where to Go Next &amp; Close</td><td>Certifications, the deepest remaining skill, the frontier, the closing argument</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="runsheet">Section 1: Run Sheet for the Remaining Teams</h2>
+
+  <p>Everything from Lecture 19 still applies — the rubric is unchanged, the peer form is unchanged, the demo-hygiene rules are unchanged. Three things differ.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Lecture 19</th><th>Lecture 20</th><th>What to Do About It</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Presentation</strong></td><td>12 minutes</td><td>10 minutes</td><td>Cut two slides now, not on the day. Merge the two <em>Data</em> slides and trim the demo to two questions</td></tr>
+      <tr><td><strong>Q&amp;A</strong></td><td>5 minutes</td><td>3 minutes</td><td>Expect two questions, not four. Answer the one asked, not the one you rehearsed</td></tr>
+      <tr><td><strong>Changeover</strong></td><td>Within the slot</td><td>Within the slot</td><td>Set up during the previous team's Q&amp;A — with a shorter slot there is no slack at all</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>If you were scheduled into Lecture 20 you have had an extra week and two fewer minutes.</strong> That is a fair trade and the rubric does not adjust for it. The slide to cut is almost always a second architecture slide or a third dashboard view — never the recommendation, and never the limitations.</p>
+  </div>
+
+  <h3>Cross-Team Debrief — Five Minutes, Everyone</h3>
+  <p>Before the synthesis, the room answers three questions aloud. These are not rhetorical; they are the fastest learning available in the whole module, because ten teams have just run ten independent experiments on the same brief.</p>
+  <ol>
+    <li><strong>Which modelling decision did the most work?</strong> Across ten projects, which single embed-or-reference call — or which key design — bought the most, and why?</li>
+    <li><strong>Which recommendation would you fund?</strong> If you had one budget line, whose project gets it? Say why in one sentence.</li>
+    <li><strong>What did everybody get wrong?</strong> The failure that recurred across teams is the one worth naming out loud, because it is a property of the brief, not of any one team.</li>
+  </ol>
+
+  <h2 id="arc">Section 2: The Arc of the Course</h2>
+
+  <p>Ten sessions ago the question was "why would anyone use anything other than a relational database?" Everything since has been an answer to it. The table below is the course in one view: each family, the class of business question it answers best, and where you met it.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Family / Tool</th><th>The Business Question It Answers Best</th><th>Why It Wins There</th><th>Taught In</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Relational (SQL)</strong></td>
+        <td>"Is this ledger correct, and can I prove it?"</td>
+        <td>Enforced schema, multi-table transactions, mature reporting — correctness as the first-class guarantee</td>
+        <td>Lectures 1–10</td>
+      </tr>
+      <tr>
+        <td><strong>Document — MongoDB</strong></td>
+        <td>"Our records have different shapes and the analysts need to query any field. What do we store them in?"</td>
+        <td>Flexible shape, nested data stored as the application uses it, secondary indexes on anything</td>
+        <td>Lectures 12–16</td>
+      </tr>
+      <tr>
+        <td><strong>Key-value — Redis</strong></td>
+        <td>"What is happening right now, and can the page render it in under ten milliseconds?"</td>
+        <td>In-memory, O(1) lookups, purpose-built structures for counters, rankings, uniqueness and presence</td>
+        <td>Lectures 17–18</td>
+      </tr>
+      <tr>
+        <td><strong>Column-family — Cassandra</strong></td>
+        <td>"We ingest a million sensor readings a minute. Where do they land?"</td>
+        <td>Linear write scale-out, aggregation over single attributes without reading whole rows</td>
+        <td>Lecture 11 (survey)</td>
+      </tr>
+      <tr>
+        <td><strong>Graph — Neo4j</strong></td>
+        <td>"Which claimants are connected to each other through shared addresses and garages?"</td>
+        <td>Traversal cost depends on the neighbourhood, not the dataset size — where SQL self-joins collapse</td>
+        <td>Lecture 11 (survey)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>And the Skills Layered on Top</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Skill</th><th>What It Let You Do</th><th>Taught In</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CRUD and query operators</strong></td><td>Ask the database a precise question instead of pulling everything and filtering in code</td><td>Lecture 13</td></tr>
+      <tr><td><strong>Indexes and <code>explain()</code></strong></td><td>Tell the difference between "the database is slow" and "we never indexed the field we filter on"</td><td>Lecture 14</td></tr>
+      <tr><td><strong>The aggregation pipeline</strong></td><td>Turn 15,000 raw bookings into a completion rate, an hourly failure curve, and a revenue-leak estimate — and know that the <code>$match</code> stage imposing a volume floor is what stops a 46-booking hour topping the ranking</td><td>Lecture 14</td></tr>
+      <tr><td><strong>Atlas Charts</strong></td><td>Put the answer in front of someone who will never open a shell</td><td>Lectures 15–16</td></tr>
+      <tr><td><strong>Dashboard storytelling</strong></td><td>Order the charts so the conclusion is unavoidable rather than merely available</td><td>Lecture 16</td></tr>
+      <tr><td><strong>Compute-on-write architecture</strong></td><td>Serve a live dashboard in single-digit milliseconds by paying the cost at ingest</td><td>Lecture 18</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>One dataset held it all together.</strong> <code>bdma.rides</code> — 15,000 Delhi NCR bookings — was modelled in Lecture 12, queried in 13, aggregated and indexed in 14, charted in 15–16, and re-architected onto Redis counters in 17–18. The same 62.29% completion rate, 17.99% driver-cancellation rate and ₹13,33,539 revenue-leak estimate arrived by two completely different engineering routes. That is the point of Section 4.</p>
+  </div>
+
+  <h2 id="framework">Section 3: The Decision Framework — The Most Portable Asset</h2>
+
+  <p>You will forget the syntax. Within a year you will not remember the exact stage order of a pipeline or the argument order of <code>ZADD</code>, and that is fine — both are a search away. What should survive is the framework, because it is what you will actually be paid to apply. It is five questions, in this order, and it was first stated in Lecture 11 before you had the experience to see why each one matters.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>What is the access pattern?</strong> Write down the three queries the system will run most often, before naming any technology. <em>Where you saw it:</em> in Lecture 12 the embed-versus-reference decision was not a matter of taste — it was decided by whether ride and driver data were read together. In Lecture 18 the entire Redis key schema was derived from one sentence: "the dashboard asks for today's totals every five seconds."</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>What does a stale read cost?</strong> A rupee, or a slightly out-of-date view count? <em>Where you saw it:</em> the Redis dashboard in Lecture 18 serves numbers that may be milliseconds behind the write — entirely acceptable for an operations screen, and entirely unacceptable if the same number drove a driver payout. Same data, different tolerance, different store.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>How fast does the schema change?</strong> Monthly change favours a document model; a schema untouched for three years favours relational. <em>Where you saw it:</em> adding a <code>cancellation_reason</code> field to some ride documents and not others took no migration in Lecture 13. The same change on a 15-million-row SQL table is a planned release with a rollback plan.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>What is the realistic volume in three years?</strong> Be honest, and multiply by a sane growth rate rather than an ambitious one. <em>Where you saw it:</em> 15,000 documents fit in the free M0 tier with room to spare. Most business systems never leave single-server territory — and adopting a distributed database you do not need imports operational complexity you will certainly pay for.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>Who operates it at 3 a.m.?</strong> The best database for a team that cannot run it is the wrong database. <em>Where you saw it:</em> every lab in this course ran on Atlas — a managed service — precisely so that none of you had to configure a replica set. That convenience is a real, recurring cost line, and it is almost always worth paying.</p></div>
+  </div>
+
+  <div class="callout green">
+    <p><strong>How to use this in a meeting.</strong> When a vendor or an enthusiastic engineer proposes a technology, you do not need to know the technology. You need to ask questions 1 and 2 and watch what happens. If nobody in the room can state the three most frequent queries, the decision is being made on fashion, and your job is to send it back until the access pattern is written down. <strong>Forcing the pattern to be stated before the technology is chosen is the whole job.</strong></p>
+  </div>
+
+  <h2 id="computetrade">Section 4: Compute-on-Read vs Compute-on-Write</h2>
+
+  <p>If you remember one engineering idea from Lectures 14 to 18, make it this one. It is not a MongoDB-versus-Redis question — it recurs in data warehouses, caching layers, materialised views, and every reporting system you will ever commission.</p>
+
+  <p>Every derived number — a completion rate, a daily total, a leaderboard position — is computed at one of two moments: <strong>when someone asks for it</strong>, or <strong>when the underlying event happens</strong>. That choice determines your latency, your flexibility, and the cost of every new question.</p>
+
+  <h3>The Same Number, Two Ways</h3>
+  <p>In Lecture 14 you computed the completion rate with an aggregation pipeline: scan the matching documents, group, divide. The database did the work at the moment you asked, and the answer reflected every document written up to that instant.</p>
+
+  <pre><code>// Compute-on-read — MongoDB, Lecture 14
+db.rides.aggregate([
+  { $match: { booking_date: { $gte: ISODate("2024-01-01") } } },
+  { $group: { _id: "$status", n: { $sum: 1 } } }
+])
+// Cost paid: at query time, every time. Any new question is free.</code></pre>
+
+  <p>In Lecture 18 you computed the same rate differently: every ride, as it was written, incremented a small set of Redis counters. The dashboard then performed no computation at all — it read four integers.</p>
+
+  <pre><code>// Compute-on-write — Redis, Lecture 18
+INCR  rides:2024-06-14:total
+INCR  rides:2024-06-14:status:completed
+HINCRBY rides:2024-06-14:byhour 18 1
+// Cost paid: once per event. Reads are O(1) — and only for questions you anticipated.</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Compute-on-Read (MongoDB aggregation)</th><th>Compute-on-Write (Redis counters)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>When the work happens</strong></td><td>At query time, on every request</td><td>Once, at ingest</td></tr>
+      <tr><td><strong>Read latency</strong></td><td>Tens of milliseconds to seconds, scaling with data volume</td><td>Sub-millisecond, flat regardless of history</td></tr>
+      <tr><td><strong>Write cost</strong></td><td>One insert</td><td>One insert plus N counter updates</td></tr>
+      <tr><td><strong>A brand-new question</strong></td><td><strong>Free.</strong> Write a new pipeline and run it against existing data</td><td><strong>Expensive.</strong> New key, new write-path code, and a backfill over history</td></tr>
+      <tr><td><strong>Correcting bad data</strong></td><td>Fix the documents; every future query is correct automatically</td><td>Fix the documents <em>and</em> recompute every derived counter</td></tr>
+      <tr><td><strong>Storage</strong></td><td>Raw data only</td><td>Raw data plus every pre-computed aggregate</td></tr>
+      <tr><td><strong>Right for</strong></td><td>Exploration, ad-hoc analysis, monthly reporting, anything where the questions are still moving</td><td>Live dashboards, leaderboards, rate limits, counters on a page rendered thousands of times a second</td></tr>
+      <tr><td><strong>Fails when</strong></td><td>Query volume is high and latency must be flat</td><td>The questions change faster than you can ship write-path code</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The decision rule.</strong> Compute on read until read latency or query volume makes it untenable — then move <em>only the specific, stable, high-traffic questions</em> to compute-on-write. Pre-computing an aggregate is a commitment: you are betting that this question will still be asked next year. Teams that pre-compute everything up front build a system that is fast at answering last quarter's questions and incapable of answering this quarter's.</p>
+  </div>
+
+  <h3>The Hybrid, Which Is What Real Systems Do</h3>
+  <ol>
+    <li>Every ride is written to MongoDB as the <strong>system of record</strong> — complete, correctable, and queryable on any field.</li>
+    <li>The same write path increments a handful of Redis counters for the five numbers the live dashboard needs.</li>
+    <li>The operations screen reads Redis and renders instantly.</li>
+    <li>Analysts run aggregation pipelines against MongoDB for anything the counters do not cover, which is most new questions.</li>
+    <li>A nightly job recomputes the Redis counters from MongoDB, so drift and missed increments are corrected within a day.</li>
+  </ol>
+  <p>Step 5 is the one teams forget, and it is what makes the architecture survivable. Derived data drifts. If there is no path back to the source of truth, the dashboard slowly becomes confidently wrong — which is worse than being slow.</p>
+
+  <h2 id="polyglot">Section 5: Polyglot Persistence — The Mature Answer</h2>
+
+  <p>Lecture 11 ended on the claim that most large organisations run several databases. Having now built on two of them, you can see why that is engineering rather than indecision. A single ride-hailing business might reasonably run:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Workload</th><th>Store</th><th>The Property That Decided It</th></tr></thead>
+    <tbody>
+      <tr><td>Driver payouts and invoices</td><td>PostgreSQL</td><td>Multi-row transactions and auditability — a stale read costs real money</td></tr>
+      <tr><td>Ride records and analytics</td><td>MongoDB</td><td>Shape varies by product line; analysts query any field ad hoc</td></tr>
+      <tr><td>Live surge and ops dashboard</td><td>Redis</td><td>Sub-millisecond reads on a page refreshed every few seconds</td></tr>
+      <tr><td>Sensor and telemetry ingest</td><td>Cassandra</td><td>Sustained write throughput beyond a single node</td></tr>
+      <tr><td>Fraud ring detection</td><td>Neo4j</td><td>Multi-hop traversal that SQL self-joins cannot do at depth</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <p><strong>The honest cost, which vendors omit.</strong> Every additional store is another thing to back up, monitor, patch, secure, capacity-plan, and hire for — and the data between them must be kept consistent by application code that nobody enjoys writing. Polyglot persistence is correct when each store is carrying a genuinely different access pattern, and it is an expensive mistake when it is three databases doing one job because three teams each had a preference. The test is question 5 of the framework: <em>who operates it at 3 a.m.?</em> Two stores run well beat five run badly.</p>
+  </div>
+
+  <h2 id="capabilities">Section 6: What You Can Now Do</h2>
+
+  <p>Not "appreciate" or "be aware of". These are things you can sit down and do, and they are the honest output of ten sessions.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Capability</th><th>Concretely</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Size an Atlas cluster for a known workload</strong></td><td>Estimate document size and count, project three-year growth, work out the working-set memory requirement, and say which tier it needs and why</td></tr>
+      <tr><td><strong>Read an <code>explain()</code> plan</strong></td><td>Identify <code>COLLSCAN</code> versus <code>IXSCAN</code>, compare <code>totalDocsExamined</code> against <code>nReturned</code>, and state whether an index is being used and whether it is the right one</td></tr>
+      <tr><td><strong>Design a compound index that obeys ESR</strong></td><td>Equality fields first, Sort fields second, Range fields last — and explain to an engineer why their field order is costing a sort in memory</td></tr>
+      <tr><td><strong>Make the embed-versus-reference call</strong></td><td>Decide from access pattern, document growth, and update frequency — and say what would have to change for the other answer to win</td></tr>
+      <tr><td><strong>Write a multi-stage aggregation pipeline</strong></td><td><code>$match</code> early, <code>$group</code>, <code>$unwind</code>, <code>$lookup</code>, <code>$sort</code>, <code>$project</code> — and order the stages so the expensive ones see the fewest documents, with a volume floor before any ranking by rate</td></tr>
+      <tr><td><strong>Design a Redis key schema</strong></td><td>Name keys by a consistent convention, pick the structure for the property you need, set TTLs deliberately, and estimate memory before you ship</td></tr>
+      <tr><td><strong>Build a dashboard that survives a stranger</strong></td><td>Headline metric, then the driver, then the detail — with units on every axis, denominators beside every percentage, and no rate ranked without the volume behind it</td></tr>
+      <tr><td><strong>Turn a finding into a funded recommendation</strong></td><td>Quantify the problem, propose a specific action, estimate the return against the cost, and design the test that would prove it</td></tr>
+      <tr><td><strong>Challenge a vendor who says their database needs no schema</strong></td><td>Reply that the schema has moved into the application, ask who validates it there, and ask what happens on the day two services disagree about a field's type</td></tr>
+      <tr><td><strong>Recognise when NoSQL is the wrong answer</strong></td><td>Stable schema, single-server volume, transactional correctness, a team fluent in SQL — recommend PostgreSQL and be right</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The last row is the one that matters most.</strong> A manager who can only recommend the new thing is not more useful than one who can only recommend the old thing. The value is in the <em>discrimination</em> — and recommending the boring, well-understood option when it fits is a senior move, not a timid one.</p>
+  </div>
+
+  <h2 id="next">Section 7: Where to Go Next</h2>
+
+  <h3>Certifications Worth the Time</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Path</th><th>What It Covers</th><th>Why Bother</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MongoDB University — Associate Developer</strong></td><td>CRUD, indexing, aggregation, data modelling, driver usage. Free courses; the exam carries a fee, with student discounts available</td><td>It is the natural next step from this course — roughly 70% of the syllabus is material you have already covered, and the remainder is drivers and deployment</td></tr>
+      <tr><td><strong>MongoDB University — Associate Database Administrator</strong></td><td>Replica sets, sharding, backup, security, performance tuning</td><td>Take this instead if you are heading toward platform or infrastructure work rather than application development</td></tr>
+      <tr><td><strong>Redis University</strong></td><td>Free, self-paced: RU101 for the data structures, then streams, search, and JSON modules</td><td>Lecture 17 covered perhaps a third of Redis. Streams and the search module are both worth a weekend</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The Deepest Remaining Skill — The Aggregation Pipeline</h3>
+  <p>If you pursue one technical thing further, make it the aggregation framework. Lecture 14 covered the stages you need most often; the framework has roughly thirty more, and the ones that reward study are <code>$facet</code> (several independent aggregations over one pass of the data, which is how a multi-panel dashboard is built efficiently), <code>$bucket</code> and <code>$bucketAuto</code> for distribution analysis, <code>$graphLookup</code> for recursive hierarchies, and the window functions <code>$setWindowFields</code> added in version 5.0 for running totals and moving averages. It is the single highest-leverage skill in the MongoDB ecosystem, because almost every reporting requirement reduces to a pipeline.</p>
+
+  <h3>The Current Frontier — Vector Search in Atlas</h3>
+  <p>The most significant recent change in this space is that document databases have absorbed vector search. Atlas Vector Search lets you store an embedding — a numeric array representing the meaning of a piece of text or an image — in an ordinary field alongside the rest of the document, index it, and query by semantic similarity rather than by exact match. The practical consequence is that a retrieval-augmented generation system, which until recently required a separate specialised vector database alongside your operational one, can now run on the store you already operate. That matters commercially far more than it matters technically: it removes a system from the architecture, and by question 5 of the framework, removing a system is usually worth more than any feature you would gain by adding one. Treat it as a strong default to evaluate rather than a settled answer — the dedicated vector databases remain faster at very large scale, and the honest version of this recommendation is that most organisations never reach that scale.</p>
+
+  <h3>Keep These Pages</h3>
+  <p>This site stays up. The pieces you are most likely to come back to:</p>
+  <ul>
+    <li><a href="../index.html">Course Home</a> — every lecture's notes and slides, in order</li>
+    <li><a href="../assignments.html">Assignments</a> — the briefs, including this capstone, with their rubrics</li>
+    <li><a href="../commands.html">Command Reference</a> — the MongoDB and Redis commands used across the course, in one page</li>
+    <li><a href="../dashboard/index.html">Live Dashboard</a> — the Lecture 18 Redis dashboard, as a reference implementation of compute-on-write</li>
+    <li><a href="../lecture14/notes.html">Lecture 14</a> and <a href="../lecture18/notes.html">Lecture 18</a> — the two halves of the trade in Section 4, worth re-reading together</li>
+  </ul>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Course</h3>
+    <ol>
+      <li><strong>There is no best database — only a best fit for a stated access pattern.</strong> Every technology comparison that does not begin with the access pattern is a comparison of marketing material.</li>
+      <li><strong>The five questions outlive the syntax.</strong> Access pattern, cost of staleness, rate of schema change, realistic three-year volume, and who operates it at 3 a.m. Apply them to technologies this course never mentioned.</li>
+      <li><strong>Every derived number is computed on read or on write.</strong> MongoDB aggregation is flexible and pays at query time; Redis counters are instant and pay at ingest. Move a question to compute-on-write only once it is stable and expensive.</li>
+      <li><strong>Pre-computation is a commitment, not an optimisation.</strong> And derived data needs a scheduled path back to the source of truth, or it drifts into being confidently wrong.</li>
+      <li><strong>Polyglot persistence is normal and not free.</strong> Each store earns its place by carrying a different access pattern — two run well beat five run badly.</li>
+      <li><strong>Your job is to force the access pattern to be stated before the technology is chosen.</strong> You will rarely write the migration. You will frequently be the person in the room who can insist the question is answered first.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ That's the course. Thank you.</h3>
+    <p>Ten sessions ago the proposition was that relational databases had met a class of problem they served badly. You have now modelled one dataset five ways, indexed it, aggregated it, charted it, re-architected it onto counters, and defended a recommendation built on it in front of a sceptical room. Keep the framework; look the syntax up. If you take one habit from this course, take the habit of asking <em>"what are the three queries this system will run most often?"</em> before anyone names a product — and notice how often nobody has written them down. That gap is where your value is. Good luck with the projects, and with the meetings.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture19/notes.html">← Lecture 19</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../index.html">Course Home →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assignments &amp; Assessment | BDMA</title>
+  <meta name="description" content="Grading breakdown, three assignments, the team project brief and rubric for BDMA Lectures 11–20." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/notes.css" />
+  <link rel="stylesheet" href="assets/css/pages.css" />
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <a href="index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Assignments</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Assessment</span>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Assessment</div>
+  <h1>Assignments &amp; Project</h1>
+  <p class="subtitle">Three individual assignments, one team project, and the participation that holds the lab sessions together. Everything is marked on the decision you reach, not the technology you used to reach it.</p>
+  <div class="meta-row">
+    <span>📊 <strong>Weight:</strong> 100% of Part 2</span>
+    <span>📝 <strong>Assignments:</strong> 3 individual</span>
+    <span>👥 <strong>Project:</strong> teams of 3–4</span>
+    <span>📦 <strong>Dataset:</strong> <code>bdma.rides</code></span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#breakdown">Grading Breakdown</a></li>
+      <li><a href="#assignments">The Three Assignments</a></li>
+      <li><a href="#project">The Team Project</a></li>
+      <li><a href="#rubric">Project Rubric</a></li>
+      <li><a href="#submission">How to Submit</a></li>
+      <li><a href="#policies">Late Work, Collaboration &amp; AI Use</a></li>
+      <li><a href="#failures">How Submissions Lose Marks</a></li>
+    </ol>
+  </div>
+
+  <h2 id="breakdown">Grading Breakdown</h2>
+  <p>Part 2 of the course (Lectures 11–20) is assessed out of 100. The weighting deliberately favours the project, because the project is the only component where you choose the problem.</p>
+
+  <div class="grade-list">
+    <div class="grade-row">
+      <div class="grade-top"><span class="grade-name">Team Project &amp; Presentation</span><span class="grade-pct">40%</span></div>
+      <div class="grade-track"><div class="grade-fill" style="width:40%"></div></div>
+      <div class="grade-note">A dataset, a data model, a dashboard and a recommendation. Presented in Lecture 19 or 20.</div>
+    </div>
+    <div class="grade-row">
+      <div class="grade-top"><span class="grade-name">Individual Assignments (3)</span><span class="grade-pct">35%</span></div>
+      <div class="grade-track"><div class="grade-fill blue" style="width:35%"></div></div>
+      <div class="grade-note">10% + 12% + 13%, rising in weight as the work gets harder.</div>
+    </div>
+    <div class="grade-row">
+      <div class="grade-top"><span class="grade-name">In-Class Quizzes</span><span class="grade-pct">15%</span></div>
+      <div class="grade-track"><div class="grade-fill amber" style="width:15%"></div></div>
+      <div class="grade-note">Short, unannounced, at the start of a session. Best 4 of 5 count.</div>
+    </div>
+    <div class="grade-row">
+      <div class="grade-top"><span class="grade-name">Lab Participation</span><span class="grade-pct">10%</span></div>
+      <div class="grade-track"><div class="grade-fill green" style="width:10%"></div></div>
+      <div class="grade-note">Arriving with a working environment and completing the hands-on section of each session.</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p><strong>Deadlines are expressed relative to lectures, not dates.</strong> Each assignment is due at 23:59 on the day before the lecture named below, so the material is fresh and the next session can build on your answers. Calendar dates are confirmed in class and on the LMS.</p>
+  </div>
+
+  <h2 id="assignments">The Three Assignments</h2>
+  <p>All three run on the course dataset — 15,000 ride bookings in <code>bdma.rides</code>. Because the dataset is seeded, your numbers must match the published figures exactly. If they do not, your query is wrong, and that is useful feedback before the deadline rather than after it.</p>
+
+  <div class="sub-grid">
+
+    <div class="sub-card">
+      <div class="sub-head">
+        <span class="sub-tag">Assignment 1</span>
+        <span class="sub-weight">10%</span>
+      </div>
+      <h3>Data Modelling &amp; the Document Shape</h3>
+      <p>Load the dataset into your own Atlas cluster, then argue for a document design.</p>
+      <ul>
+        <li>Import <code>uber_bookings.json</code> and prove the load with <code>countDocuments()</code></li>
+        <li>Explain why <code>route</code> and <code>ratings</code> are embedded rather than referenced</li>
+        <li>Identify three fields that are deliberately absent on failed bookings and explain what that absence encodes</li>
+        <li>Propose a schema change you would make if drivers became a first-class entity, and justify embed vs reference</li>
+      </ul>
+      <div class="sub-meta">
+        <span>📅 Due before <strong>Lecture 13</strong></span>
+        <span>📚 Covers <strong>L11–L12</strong></span>
+        <span>📄 <strong>2 pages</strong> + screenshots</span>
+      </div>
+    </div>
+
+    <div class="sub-card">
+      <div class="sub-head">
+        <span class="sub-tag">Assignment 2</span>
+        <span class="sub-weight">12%</span>
+      </div>
+      <h3>Querying, Indexing &amp; Aggregation</h3>
+      <p>Eight questions, each answered with a query you wrote and a number you can defend.</p>
+      <ul>
+        <li>Write the pipeline that reproduces the 62.29% completion rate in a single pass</li>
+        <li>Rank vehicle types by revenue, then explain why that ranking differs from ranking by volume</li>
+        <li>Compute failure rate by hour, applying a minimum-volume <code>$match</code>, and justify your threshold</li>
+        <li>Add one index, then submit the <code>explain("executionStats")</code> output from <strong>before and after</strong> with <code>totalDocsExamined</code> highlighted</li>
+      </ul>
+      <div class="sub-meta">
+        <span>📅 Due before <strong>Lecture 16</strong></span>
+        <span>📚 Covers <strong>L13–L14</strong></span>
+        <span>📄 <strong>Queries + output</strong></span>
+      </div>
+    </div>
+
+    <div class="sub-card">
+      <div class="sub-head">
+        <span class="sub-tag">Assignment 3</span>
+        <span class="sub-weight">13%</span>
+      </div>
+      <h3>Dashboard &amp; the One-Page Recommendation</h3>
+      <p>Build a four-chart dashboard in Atlas Charts, then write the memo a manager would actually read.</p>
+      <ul>
+        <li>Four charts, each answering a stated question — no chart without a question</li>
+        <li>Every axis labelled, every unit stated, every filter disclosed</li>
+        <li>A one-page memo: the finding, the quantified impact, the recommended action, and what would prove you wrong</li>
+        <li>One paragraph on what the dashboard <em>cannot</em> tell you</li>
+      </ul>
+      <div class="sub-meta">
+        <span>📅 Due before <strong>Lecture 18</strong></span>
+        <span>📚 Covers <strong>L15–L16</strong></span>
+        <span>📄 <strong>1-page memo</strong> + dashboard link</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="callout green">
+    <p><strong>The same standard applies to all three.</strong> A correct number with no interpretation scores roughly half. A confident interpretation built on a wrong number scores less. We are training the habit of checking the figure <em>and</em> saying what it means.</p>
+  </div>
+
+  <h2 id="project">The Team Project</h2>
+  <p>Teams of three or four. One dataset, modelled in a non-relational database, visualised in a dashboard, and argued into a recommendation. Presented in Lecture 19 or Lecture 20 and worth 40% of Part 2.</p>
+
+  <div class="sub-grid">
+    <div class="sub-card team">
+      <div class="sub-head">
+        <span class="sub-tag blue">Project</span>
+        <span class="sub-weight">40%</span>
+      </div>
+      <h3>Required Deliverables</h3>
+      <p>Five things, all of which the rubric marks explicitly.</p>
+      <ul>
+        <li><strong>Data in a non-relational store</strong> — MongoDB Atlas, Redis, or both with a justified split</li>
+        <li><strong>A non-trivial aggregation pipeline or Redis key schema</strong> that answers a business question</li>
+        <li><strong>One index with a before/after <code>explain()</code></strong>, or a documented Redis key design with its memory argument</li>
+        <li><strong>A working dashboard</strong> — Atlas Charts, or the Node + Redis pattern from Lecture 18</li>
+        <li><strong>A written data-model justification</strong> — why you embedded, referenced or keyed the way you did</li>
+      </ul>
+      <div class="sub-meta">
+        <span>👥 <strong>3–4 people</strong></span>
+        <span>🎤 <strong>12 min</strong> + 5 min Q&amp;A</span>
+        <span>📅 <strong>Lecture 19 or 20</strong></span>
+      </div>
+    </div>
+
+    <div class="sub-card ongoing">
+      <div class="sub-head">
+        <span class="sub-tag amber">Choosing a dataset</span>
+        <span class="sub-weight">—</span>
+      </div>
+      <h3>Bring Your Own, Preferably</h3>
+      <p>You may use the course Uber dataset, but a dataset you chose yourself nearly always produces a better presentation — you care about the answer.</p>
+      <ul>
+        <li>Kaggle, <a href="https://data.gov.in/">data.gov.in</a>, RBI and NSE public releases</li>
+        <li>A dataset from your own workplace or internship, with permission and anything sensitive removed</li>
+        <li>Rough size guide: at least a few thousand records, and at least one field that genuinely varies in shape</li>
+        <li>Clear it with the lecturer before Lecture 17 so nobody discovers in week nine that their data has 40 rows</li>
+      </ul>
+      <div class="sub-meta">
+        <span>✅ Confirm by <strong>Lecture 17</strong></span>
+        <span>🔒 <strong>No confidential data</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The grade is for the decision, not the technology.</strong> A simple dashboard carrying a sharp, quantified recommendation beats an elaborate one that stops at &ldquo;here are some charts&rdquo;. If your final slide does not contain a verb — <em>do this</em> — you have not finished the project.</p>
+  </div>
+
+  <h2 id="rubric">Project Rubric</h2>
+  <p>Marked out of 100 and scaled to the 40% weighting. The full brief, run sheet and peer-review process are in the <a href="lecture19/notes.html">Lecture 19 notes</a>.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Criterion</th>
+          <th>Marks</th>
+          <th>What a strong answer looks like</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Technical execution</strong></td>
+          <td>25</td>
+          <td>Queries, pipelines, indexes and key designs are correct, efficient and explained. The <code>explain()</code> comparison shows a real improvement and you can say why.</td>
+        </tr>
+        <tr>
+          <td><strong>Data modelling &amp; justification</strong></td>
+          <td>20</td>
+          <td>The embed/reference or key-naming decision is stated, defended against the obvious alternative, and tied to a specific access pattern.</td>
+        </tr>
+        <tr>
+          <td><strong>Dashboard design &amp; clarity</strong></td>
+          <td>20</td>
+          <td>Each chart answers a stated question. Chart types suit the data. Axes, units and filters are labelled. Nothing on the page is decorative.</td>
+        </tr>
+        <tr>
+          <td><strong>Business framing &amp; relevance</strong></td>
+          <td>15</td>
+          <td>The problem is one an organisation would pay to solve, stated in a sentence, with the cost of <em>not</em> solving it quantified.</td>
+        </tr>
+        <tr>
+          <td><strong>Insight &amp; recommendation</strong></td>
+          <td>15</td>
+          <td>A specific action, an expected impact with a number attached, and an honest statement of what would disprove it.</td>
+        </tr>
+        <tr>
+          <td><strong>Presentation &amp; Q&amp;A</strong></td>
+          <td>5</td>
+          <td>On time, evenly shared across the team, and questions answered directly — including &ldquo;we don't know, and here is how we would find out&rdquo;.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="submission">How to Submit</h2>
+  <p>One mechanism for everything: a Git repository, submitted as a link. It takes ten minutes to set up once and then costs you nothing for the rest of the course.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>Create one repository for the course.</strong> Name it <code>bdma-&lt;your-roll-number&gt;</code>. Keep a folder per assignment: <code>assignment1/</code>, <code>assignment2/</code>, <code>assignment3/</code>, <code>project/</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>Commit the actual artefacts, not screenshots of them.</strong> Queries go in <code>.js</code> or <code>.md</code> files as text that can be copied and run. Screenshots are for dashboard output and <code>explain()</code> plans only.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>Write a <code>README.md</code> in each folder.</strong> It should state what the assignment asked, how to run your work, and the headline numbers you found. Assume the reader has three minutes.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p><strong>Never commit a connection string.</strong> Put credentials in a <code>.env</code> file and add it to <code>.gitignore</code>. A leaked Atlas URI in a public repository is an automatic deduction, and it is the single most common mistake in this course.</p>
+      <pre><code># .gitignore
+.env
+node_modules/</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <p><strong>Submit the repository link through the LMS</strong> before the deadline. For the project, one submission per team listing every member's name and roll number. The exact LMS link is announced in class.</p>
+    </div>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Make the repository public, or add the lecturer as a collaborator.</strong> A private repository nobody can open is an unsubmitted assignment, and the timestamp on your fix will be after the deadline.</p>
+  </div>
+
+  <h2 id="policies">Late Work, Collaboration &amp; AI Use</h2>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Situation</th>
+          <th>Policy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Late submission</td>
+          <td>10% of the component deducted per started day, up to three days. After that the submission is not marked. Git commit timestamps are the record.</td>
+        </tr>
+        <tr>
+          <td>Discussing approach with classmates</td>
+          <td><strong>Encouraged.</strong> Argue about whether to embed or reference — that argument is the learning.</td>
+        </tr>
+        <tr>
+          <td>Sharing queries or memo text</td>
+          <td><strong>Not permitted</strong> on individual assignments. Two identical pipelines with identical variable names is not a coincidence.</td>
+        </tr>
+        <tr>
+          <td>Using an AI assistant</td>
+          <td><strong>Permitted and expected</strong> — it is how this work is done now. Disclose it in your README, one line on what you used it for. You remain fully answerable for every number and every claim in Q&amp;A.</td>
+        </tr>
+        <tr>
+          <td>Submitting output you cannot explain</td>
+          <td>Treated as not submitted, whatever its source. The viva question &ldquo;why did you write it this way?&rdquo; is always available to the marker.</td>
+        </tr>
+        <tr>
+          <td>Using confidential workplace data</td>
+          <td>Only with written permission from the data owner and with identifiers removed. When in doubt, use a public dataset.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="failures">How Submissions Lose Marks</h2>
+  <p>These are the recurring ones, listed so that they are avoidable rather than surprising.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Failure mode</th>
+          <th>Why it costs you</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A dashboard with no recommendation</td>
+          <td>Charts describe; they do not decide. The final 15 marks are reserved for the decision.</td>
+        </tr>
+        <tr>
+          <td>Ranking a rate without a volume floor</td>
+          <td>03:00 shows a 43.48% failure rate on 46 bookings. Rank by rate alone and you will recommend staffing the night shift.</td>
+        </tr>
+        <tr>
+          <td>Unlabelled axes or undisclosed filters</td>
+          <td>An unlabelled chart cannot be checked, so it cannot be trusted, so it cannot be marked.</td>
+        </tr>
+        <tr>
+          <td>Correlation presented as causation</td>
+          <td>&ldquo;Cancellations rise with surge pricing&rdquo; is an observation. &ldquo;Surge pricing causes cancellations&rdquo; needs an experiment you did not run.</td>
+        </tr>
+        <tr>
+          <td>Averaging over missing fields without noticing</td>
+          <td><code>$avg</code> skips absent values silently. Average booking value across <em>all</em> bookings is not the same as across completed ones, and the gap is large.</td>
+        </tr>
+        <tr>
+          <td>A live demo with no fallback</td>
+          <td>Venue wi-fi fails. Keep screenshots or a recording. Losing four minutes of a twelve-minute slot to a loading spinner costs more than the demo was worth.</td>
+        </tr>
+        <tr>
+          <td>A model copied from the course dataset</td>
+          <td>Your dataset has different access patterns. Reusing our schema without re-deriving it is the one thing Lecture 11 told you never to do.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Start here</h3>
+    <p>If you are picking up the project for the first time, read the full brief and run sheet in the <a href="lecture19/notes.html">Lecture 19 notes</a>, then look at the <a href="dashboard/index.html">reference dashboard</a> to see the standard a finished analysis is held to. The <a href="commands.html">command reference</a> has every query you will need.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="index.html">← Course Home</a>
+    <span class="spacer"></span>
+    <a href="commands.html">Commands</a>
+    <a href="dashboard/index.html">Dashboard →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="index.html">Course Home</a> &nbsp;·&nbsp; <a href="commands.html">Commands</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+
+</body>
+</html>

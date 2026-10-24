@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 18 — Building a Real-Time Analytics Dashboard with Redis | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 18 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 4</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 4 · Lecture 18</div>
+  <h1>Building a Real-Time Analytics Dashboard with Redis</h1>
+  <p class="subtitle">A build session — compute on write, read in O(1), and count a million customers with a bitwise AND</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO3, CLO4</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 17 (Redis structures, bitmaps, key naming)</span>
+    <span>🔧 <strong>Lab:</strong> Node 18+, <code>redis</code> and <code>express</code>, running <code>bdma-redis</code> container</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#architecture">The Architecture of a Live Dashboard</a></li>
+      <li><a href="#shift">Compute on Write, Not on Read</a></li>
+      <li><a href="#schema">The Redis Key Schema</a></li>
+      <li><a href="#writer">The Writer — Ingesting Bookings</a></li>
+      <li><a href="#reader">The Reader — An API over the Aggregates</a></li>
+      <li><a href="#retention">Retention with Bitmaps</a></li>
+      <li><a href="#compare">Redis vs Atlas Charts — and the Limits</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Describe the four-stage architecture of a real-time dashboard — event source, writer, read API, browser — and the responsibility of each stage</li>
+    <li><span class="check">✓</span> Contrast compute-on-read (MongoDB aggregation) with compute-on-write (Redis counters) and state when each is the correct choice</li>
+    <li><span class="check">✓</span> Design and document a complete key schema mapping key pattern → type → purpose for a stated set of business metrics</li>
+    <li><span class="check">✓</span> Write a Node.js ingest function that updates eight Redis structures atomically with <code>MULTI</code>/<code>EXEC</code>, and defend every guard against absent fields</li>
+    <li><span class="check">✓</span> Build an Express endpoint that assembles a full dashboard payload with <code>MGET</code>, <code>ZREVRANGE … WITHSCORES</code>, <code>BITCOUNT</code> and <code>HGETALL</code></li>
+    <li><span class="check">✓</span> Compute day-over-day retention with <code>BITOP AND</code> plus <code>BITCOUNT</code> and justify the memory cost at a million customers</li>
+    <li><span class="check">✓</span> Evaluate the Redis dashboard against the Atlas Charts dashboard on freshness, query cost, flexibility, memory, durability and fit</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–6 min</td><td>Recap &amp; Build Brief</td><td>What we are shipping today and how it differs from the Atlas Charts dashboard</td></tr>
+      <tr><td>6–16 min</td><td>Architecture</td><td>Event source → writer → read API → browser; where each piece runs and why</td></tr>
+      <tr><td>16–28 min</td><td>The Design Shift</td><td>Compute on write vs compute on read; the cost model of each</td></tr>
+      <tr><td>28–40 min</td><td>Key Schema Design</td><td>Eight keys, five types; naming, TTLs, and handling absent fields</td></tr>
+      <tr><td>40–58 min</td><td>Build the Writer</td><td><code>MULTI</code>/<code>EXEC</code>, pipelining a batch, backfilling from <code>bdma.rides</code></td></tr>
+      <tr><td>58–72 min</td><td>Build the Reader</td><td>Express handler, the dashboard payload, a polling browser view</td></tr>
+      <tr><td>72–82 min</td><td>Retention &amp; Comparison</td><td><code>BITOP AND</code> cohort; side-by-side against Atlas Charts</td></tr>
+      <tr><td>82–90 min</td><td>Limits &amp; Wrap-Up</td><td>What a new question costs; Lecture 19 project-presentation brief</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="architecture">Section 1: The Architecture of a Live Dashboard</h2>
+
+  <p>We are building the thing a ride-hailing operations room actually stares at: total bookings, revenue so far today, the status mix, revenue by vehicle type, the busiest pickup points, the hourly curve, the payment split, and how many distinct customers have booked today — all refreshing every two seconds.</p>
+
+  <p>The model is the Redis Labs reference project <a href="https://github.com/redis-developer/basic-analytics-dashboard-redis-bitmaps-nodejs" target="_blank" rel="noopener">basic-analytics-dashboard-redis-bitmaps-nodejs</a>, rebuilt against our own ride-booking domain so it connects to everything you have already modelled.</p>
+
+  <h3>Four Stages</h3>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>Event source.</strong> Every completed or failed booking is an event. In production this is the booking service emitting to a queue. In our lab it is a replayer that streams <code>data/uber_bookings.json</code> — the 15,000 documents generated by <code>data/generate_uber_dataset.js</code> — at a few per second.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>Writer.</strong> A Node.js function that receives one booking and updates every Redis structure that booking affects, in a single atomic transaction. This is where all the analytical work happens — once per event, never again.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>Read API.</strong> A small Express service that reads the already-computed aggregates and returns one JSON payload. It performs no grouping, no sorting, no scanning — every value it returns already exists.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Browser.</strong> A static page that polls <code>/api/dashboard</code> every two seconds and repaints. Because the read is cheap, polling at this rate is reasonable — which is exactly what makes the dashboard feel live.</p></div>
+  </div>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Stage</th><th>Runs</th><th>Does</th><th>Cost per booking / per view</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1. Event source</strong></td><td>Once per booking</td><td>Emits the booking document</td><td>—</td></tr>
+      <tr><td><strong>2. Writer</strong></td><td>Once per booking</td><td>~8 Redis commands in one <code>MULTI</code></td><td>Sub-millisecond, paid once</td></tr>
+      <tr><td><strong>3. Read API</strong></td><td>Once per dashboard poll</td><td>5 reads, all O(1) or O(log N)</td><td>Sub-millisecond, independent of data volume</td></tr>
+      <tr><td><strong>4. Browser</strong></td><td>Every 2 seconds</td><td><code>fetch</code> + repaint</td><td>One HTTP request</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Note where MongoDB sits in this picture:</strong> still underneath, still holding all 15,000 booking documents permanently. Redis never replaces it. If a Redis key is lost or a new metric is added, stage 2 is re-run over the <code>rides</code> collection and the aggregates are rebuilt. The system of record is what makes the speed layer disposable — and therefore safe.</p>
+  </div>
+
+  <h2 id="shift">Section 2: Compute on Write, Not on Read</h2>
+
+  <p>This is the central idea of the lecture, and it is a direct reversal of what you did in Module 3.</p>
+
+  <h3>What You Did in Lectures 13–16</h3>
+  <pre><code>// MongoDB — the work happens when somebody asks
+db.rides.aggregate([
+  { $match: { status: "Completed" } },
+  { $group: { _id: "$vehicle_type", revenue: { $sum: "$booking_value" } } },
+  { $sort:  { revenue: -1 } },
+  { $limit: 5 }
+])</code></pre>
+  <p>Beautiful, flexible, and <strong>re-executed in full every single time the tile renders</strong>. The cost is proportional to the number of matching documents, so it grows as the business grows — precisely backwards from what you want.</p>
+
+  <h3>What You Will Do Today</h3>
+  <pre><code>// Redis — the work happens when the booking arrives
+ZINCRBY dash:vehicle:revenue 412.50 "Go Sedan"     // once, on write
+
+// ... and the dashboard read, forever after:
+ZREVRANGE dash:vehicle:revenue 0 4 WITHSCORES      // O(log N + 5)</code></pre>
+  <p>The aggregate is maintained incrementally. A read is a slice of an already-sorted structure, and its cost does not depend on whether you have processed 15,000 bookings or 15,000,000.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Compute on read (MongoDB)</th><th>Compute on write (Redis)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>When the work happens</strong></td><td>At query time, every time</td><td>Once per event, at ingest</td></tr>
+      <tr><td><strong>Read cost</strong></td><td>Grows with data volume</td><td>Constant — O(1) or O(log N)</td></tr>
+      <tr><td><strong>Write cost</strong></td><td>One insert</td><td>One insert <em>plus</em> ~8 counter updates</td></tr>
+      <tr><td><strong>New question</strong></td><td>Write a new pipeline. Answer available immediately, over all history</td><td>Change the writer, redeploy, <strong>backfill</strong>. Nothing before the change exists</td></tr>
+      <tr><td><strong>Total work at 1M reads of 1 metric</strong></td><td>1,000,000 aggregations</td><td>1 increment + 1,000,000 cheap lookups</td></tr>
+      <tr><td><strong>Right when</strong></td><td>Questions are varied, unpredictable, infrequent, exploratory</td><td>Questions are known, fixed, and asked constantly</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The decision rule, in one line:</strong> if the read-to-write ratio is high and the question is stable, pre-compute. If the read-to-write ratio is low or the questions keep changing, compute on demand. An operations dashboard refreshed by forty people all day is the first case. An analyst exploring last quarter's cancellations is the second. <strong>Most real companies run both, over the same data.</strong></p>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The hidden cost, stated plainly:</strong> pre-computation moves work from the read path to the write path, and it moves <em>risk</em> with it. A bug in the writer corrupts a counter permanently — there is no re-query that fixes it. This is why the system of record matters: your repair procedure is "delete the key and replay <code>bdma.rides</code>", and you should have tested that procedure before you need it.</p>
+  </div>
+
+  <h2 id="schema">Section 3: The Redis Key Schema</h2>
+
+  <p>Redis has no catalogue, so this table is the schema. Write it before you write code; keep it in the repository next to the writer.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Key pattern</th><th>Type</th><th>Purpose</th><th>Written by</th></tr></thead>
+    <tbody>
+      <tr><td><code>dash:total:bookings</code></td><td>String</td><td>All bookings ever ingested</td><td><code>INCR</code></td></tr>
+      <tr><td><code>dash:status:{status}</code></td><td>String</td><td>One counter per outcome — <code>completed</code>, <code>cancelled-by-driver</code>, <code>no-driver-found</code>, <code>cancelled-by-customer</code>, <code>incomplete</code></td><td><code>INCR</code></td></tr>
+      <tr><td><code>dash:revenue:{YYYY-MM-DD}</code></td><td>String</td><td>Running completed revenue for a date</td><td><code>INCRBYFLOAT</code></td></tr>
+      <tr><td><code>dash:vehicle:revenue</code></td><td>Sorted Set</td><td>Revenue per vehicle type, permanently ranked</td><td><code>ZINCRBY</code></td></tr>
+      <tr><td><code>dash:pickup:top</code></td><td>Sorted Set</td><td>Booking count per pickup location, permanently ranked</td><td><code>ZINCRBY</code></td></tr>
+      <tr><td><code>dash:hour:{H}</code></td><td>String</td><td>24 hourly buckets, <code>H</code> = 0–23</td><td><code>INCR</code></td></tr>
+      <tr><td><code>dash:customers:{YYYY-MM-DD}</code></td><td>Bitmap</td><td>One bit per customer — did they book that day?</td><td><code>SETBIT</code> at the numeric offset</td></tr>
+      <tr><td><code>dash:payment</code></td><td>Hash</td><td>Booking count per payment method</td><td><code>HINCRBY</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Three Decisions Embedded in That Table</h3>
+
+  <h4>1. Status values are slugged, not raw</h4>
+  <p><code>"Cancelled by Driver"</code> becomes <code>dash:status:cancelled-by-driver</code>. Spaces in key names are legal but a constant nuisance in <code>redis-cli</code>, in logs, and in shell scripts. Normalise once, in one helper, and never think about it again.</p>
+
+  <h4>2. Customer offsets come from the ID</h4>
+  <p>Our IDs are <code>CID482910</code>. Strip the three-character prefix and the remainder is a dense integer offset, which is exactly what a bitmap needs. This is a gift of the dataset design — a real system with UUID customer keys would need a separate <code>customer:offset</code> Hash and an <code>INCR</code>-based allocator.</p>
+
+  <h4>3. Which keys get a TTL</h4>
+  <p>Date-scoped keys (<code>dash:customers:*</code>, <code>dash:revenue:*</code>) get 90 days. Cumulative keys (<code>dash:total:bookings</code>, the two ZSETs, <code>dash:payment</code>) get none — they are the dashboard's permanent state. Combined with <code>maxmemory-policy volatile-lru</code> from Lecture 17, that means pressure evicts old daily keys first and never touches the live aggregates.</p>
+
+  <div class="callout amber">
+    <p><strong>The field-absence trap — make this a teaching point.</strong> In <code>bdma.rides</code>, <code>booking_value</code>, <code>ride_distance</code>, <code>ratings</code> and <code>payment_method</code> are <strong>absent</strong> on cancelled and no-driver-found bookings; <code>Incomplete</code> documents carry <code>booking_value</code> and <code>ride_distance</code> but no <code>ratings</code>. That is 5,657 of 15,000 documents — 37.71% — where a naive <code>INCRBYFLOAT key undefined</code> throws, or worse, silently writes <code>NaN</code> and poisons the counter for good. <strong>Every optional field needs a guard, and every guard needs a reason you can state.</strong></p>
+  </div>
+
+  <h2 id="writer">Section 4: The Writer — Ingesting Bookings</h2>
+
+  <h3>Project Setup</h3>
+  <pre><code>mkdir bdma-redis-dashboard &amp;&amp; cd bdma-redis-dashboard
+npm init -y
+npm pkg set type=module          # enables import syntax and top-level await
+npm install redis express
+docker start bdma-redis          # the container from Lecture 17</code></pre>
+
+  <h3><code>keys.js</code> — The Schema as Code</h3>
+  <p>Never build a key string inline. One module owns every key pattern, so a rename is one edit and a typo is impossible.</p>
+
+  <pre><code>// keys.js
+export const slug = (s) =&gt; s.toLowerCase().replace(/\s+/g, '-');
+
+// "CID482910" -&gt; 482910. Dense, stable, and exactly what SETBIT needs.
+export const customerOffset = (id) =&gt; Number.parseInt(id.slice(3), 10);
+
+export const K = {
+  totalBookings:          'dash:total:bookings',
+  vehicleRevenue:         'dash:vehicle:revenue',
+  pickupTop:              'dash:pickup:top',
+  payment:                'dash:payment',
+  status:    (s)    =&gt; `dash:status:${slug(s)}`,
+  revenue:   (date) =&gt; `dash:revenue:${date}`,
+  hour:      (h)    =&gt; `dash:hour:${h}`,
+  customers: (date) =&gt; `dash:customers:${date}`,
+};</code></pre>
+
+  <h3><code>writer.js</code> — One Booking, One Transaction</h3>
+  <pre><code>// writer.js
+import { createClient } from 'redis';
+import { K, customerOffset } from './keys.js';
+
+export const redis = createClient({
+  url: process.env.REDIS_URL ?? 'redis://localhost:6379'
+});
+redis.on('error', (err) =&gt; console.error('[redis]', err.message));
+await redis.connect();
+
+const NINETY_DAYS = 60 * 60 * 24 * 90;
+
+// Queues one booking's updates onto an existing MULTI. Pure: no awaits,
+// so the same function serves a single write and a batched pipeline.
+function queueBooking(tx, b) {
+  const day  = b.date;                              // "2024-03-14"
+  const hour = new Date(b.booked_at).getUTCHours(); // 18
+
+  // --- always present on every document ---
+  tx.incr(K.totalBookings);
+  tx.incr(K.status(b.status));
+  tx.incr(K.hour(hour));
+  tx.zIncrBy(K.pickupTop, 1, b.route.pickup);
+  tx.setBit(K.customers(day), customerOffset(b.customer_id), 1);
+
+  // NX = only set the TTL if the key has none, so a day's window is not
+  // pushed forward by every booking that lands in it.
+  tx.expire(K.customers(day), NINETY_DAYS, 'NX');
+  tx.expire(K.revenue(day),  NINETY_DAYS, 'NX');
+
+  // --- absent on Cancelled / No Driver Found (5,657 of 15,000 docs) ---
+  if (typeof b.booking_value === 'number') {
+    tx.incrByFloat(K.revenue(day), b.booking_value);
+    tx.zIncrBy(K.vehicleRevenue, b.booking_value, b.vehicle_type);
+  }
+
+  // --- absent unless money actually changed hands ---
+  if (b.payment_method) {
+    tx.hIncrBy(K.payment, b.payment_method, 1);
+  }
+}
+
+export async function recordBooking(booking) {
+  const tx = redis.multi();
+  queueBooking(tx, booking);
+  return tx.exec();          // all ~8 commands, atomically
+}
+
+export async function recordBatch(bookings) {
+  const tx = redis.multi();
+  for (const b of bookings) queueBooking(tx, b);
+  return tx.exec();          // one round trip for the whole batch
+}</code></pre>
+
+  <h3>Why <code>MULTI</code>/<code>EXEC</code></h3>
+  <div class="callout">
+    <p><code>MULTI</code> opens a transaction; commands are queued on the server and <code>EXEC</code> runs the whole block without any other client's command interleaving. Two guarantees follow.</p>
+    <p><strong>Consistency between keys.</strong> Without it, a dashboard poll landing mid-write could read a total of 9,344 against a status breakdown still summing to 9,343. Small, embarrassing, and impossible to reproduce. With <code>MULTI</code>, the eight updates are visible all at once or not at all.</p>
+    <p><strong>Throughput.</strong> Eight separate <code>await</code>ed commands are eight network round trips. Queued on one <code>MULTI</code> they are one. On a 0.5 ms round trip that is 4 ms versus 0.5 ms per booking — the difference between ingesting 250 and 2,000 bookings a second.</p>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Be precise about what Redis transactions are not.</strong> There is no rollback. If one command inside <code>EXEC</code> fails at runtime — say you <code>INCR</code> a key holding a Hash — the remaining commands still run and the earlier ones stand. Redis guarantees <em>isolation</em> and <em>ordering</em>, not atomic undo. You get correctness from writing correct commands and guarding your inputs, not from a safety net.</p>
+  </div>
+
+  <h3><code>replay.js</code> — Backfilling the Course Dataset</h3>
+  <p>Load the 15,000 generated bookings to populate the dashboard, then stream the tail slowly so the page visibly moves during class.</p>
+
+  <pre><code>// replay.js
+import { readFile } from 'node:fs/promises';
+import { recordBatch, recordBooking, redis } from './writer.js';
+
+const bookings = JSON.parse(
+  await readFile(new URL('../data/uber_bookings.json', import.meta.url), 'utf8')
+);
+bookings.sort((a, b) =&gt; a.booked_at.localeCompare(b.booked_at));
+
+// 1. Backfill everything except the last 200, in batches of 500.
+const history = bookings.slice(0, -200);
+for (let i = 0; i &lt; history.length; i += 500) {
+  await recordBatch(history.slice(i, i + 500));
+}
+console.log(`backfilled ${history.length} bookings`);
+
+// 2. Dribble the remainder in so the dashboard moves while you talk.
+for (const booking of bookings.slice(-200)) {
+  await recordBooking(booking);
+  await new Promise((r) =&gt; setTimeout(r, 400));
+}
+await redis.quit();</code></pre>
+
+  <div class="callout blue">
+    <p><strong>Backfilling from the system of record instead.</strong> Swap the file read for a MongoDB cursor and the same writer serves both paths — which is the point of keeping the ingest logic in one pure function:</p>
+  </div>
+
+  <pre><code>import { MongoClient } from 'mongodb';
+const mongo = await MongoClient.connect(process.env.MONGO_URL);
+const cursor = mongo.db('bdma').collection('rides')
+                    .find({}, { sort: { booked_at: 1 } });
+
+let batch = [];
+for await (const booking of cursor) {
+  batch.push(booking);
+  if (batch.length === 500) { await recordBatch(batch); batch = []; }
+}
+if (batch.length) await recordBatch(batch);</code></pre>
+
+  <p>After the backfill, check your work against the verified figures from Module 3:</p>
+  <pre><code>GET dash:total:bookings                     # -&gt; 15000
+GET dash:status:completed                   # -&gt; 9343   (62.29%)
+GET dash:status:cancelled-by-driver         # -&gt; 2698   (17.99%)
+GET dash:status:no-driver-found             # -&gt; 1036    (6.91%)
+GET dash:status:cancelled-by-customer       # -&gt; 1022    (6.81%)
+GET dash:status:incomplete                  # -&gt;  901    (6.01%)
+ZREVRANGE dash:vehicle:revenue 0 2 WITHSCORES
+# Premier Sedan 536855 · Go Sedan 491473 · Uber XL 431927
+HGETALL dash:payment                        # UPI 45.03%, Cash 25.31% ...
+GET dash:hour:18                            # -&gt; 1373, the busiest hour</code></pre>
+
+  <div class="callout green">
+    <p><strong>This reconciliation step is not optional.</strong> A pre-computed counter has no audit trail — the only way to know it is right is to check it against the system of record. Build that check into the project now; in production it becomes a nightly job that recomputes the aggregates from Mongo and alarms on any divergence.</p>
+  </div>
+
+  <h2 id="reader">Section 5: The Reader — An API over the Aggregates</h2>
+
+  <p>Note what this handler does <em>not</em> contain: no grouping, no sorting, no filtering, no scanning. Every number it returns already exists in memory. Its only job is to fetch and shape.</p>
+
+  <pre><code>// api.js
+import express from 'express';
+import { redis } from './writer.js';
+import { K } from './keys.js';
+
+const app = express();
+const STATUSES = [
+  'Completed', 'Cancelled by Driver', 'No Driver Found',
+  'Cancelled by Customer', 'Incomplete'
+];
+const HOURS = Array.from({ length: 24 }, (_, h) =&gt; h);
+const num = (v) =&gt; Number(v ?? 0);
+
+app.get('/api/dashboard', async (req, res, next) =&gt; {
+  try {
+    const day = req.query.date ?? '2024-03-14';
+
+    const [headline, statusCounts, hourCounts, vehicles, pickups, payment, actives] =
+      await Promise.all([
+        redis.mGet([K.totalBookings, K.revenue(day)]),
+        redis.mGet(STATUSES.map((s) =&gt; K.status(s))),
+        redis.mGet(HOURS.map((h) =&gt; K.hour(h))),
+        redis.zRangeWithScores(K.vehicleRevenue, 0, 4, { REV: true }),
+        redis.zRangeWithScores(K.pickupTop,      0, 4, { REV: true }),
+        redis.hGetAll(K.payment),
+        redis.bitCount(K.customers(day)),
+      ]);
+
+    res.json({
+      date: day,
+      total_bookings:    num(headline[0]),
+      revenue_today:     Number(num(headline[1]).toFixed(2)),
+      active_customers:  actives,
+      status: Object.fromEntries(
+        STATUSES.map((s, i) =&gt; [s, num(statusCounts[i])])
+      ),
+      hourly: HOURS.map((h) =&gt; ({ hour: h, bookings: num(hourCounts[h]) })),
+      vehicle_revenue: vehicles.map(({ value, score }) =&gt;
+        ({ vehicle_type: value, revenue: score })),
+      top_pickups: pickups.map(({ value, score }) =&gt;
+        ({ pickup: value, bookings: score })),
+      payment_mix: payment,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) { next(err); }
+});
+
+app.use(express.static('public'));
+app.listen(3000, () =&gt; console.log('dashboard on http://localhost:3000'));</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Read</th><th>Command</th><th>Complexity</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td>Headline counters</td><td><code>MGET</code></td><td>O(n) in <em>keys requested</em>, not data</td><td>Total bookings, today's revenue</td></tr>
+      <tr><td>Status mix</td><td><code>MGET</code> × 5</td><td>O(5)</td><td>The five outcome counters</td></tr>
+      <tr><td>Hourly curve</td><td><code>MGET</code> × 24</td><td>O(24)</td><td>The full day's shape in one round trip</td></tr>
+      <tr><td>Top vehicles / pickups</td><td><code>ZRANGE … REV WITHSCORES</code></td><td>O(log N + 5)</td><td>Already ranked, with scores</td></tr>
+      <tr><td>Payment mix</td><td><code>HGETALL</code></td><td>O(5)</td><td>Every method and its count</td></tr>
+      <tr><td>Distinct customers today</td><td><code>BITCOUNT</code></td><td>O(bitmap bytes) — 125 KB at 1M users</td><td>Exact daily actives</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Why <code>Promise.all</code> and not six sequential <code>await</code>s?</strong> Six awaits are six serialised round trips. Issued together, node-redis writes them to the socket back to back and the server — executing serially, remember — answers them in order without the client waiting in between. Same number of commands, roughly one round trip of latency instead of six.</p>
+  </div>
+
+  <h3>Deriving a Rate — and the Gate It Needs</h3>
+
+  <p>Every number in that payload is a count. The moment the business asks for a <strong>rate</strong> — "failure rate by hour", the chart you built in Module 3 — you hit the first real limit of compute-on-write: a ratio needs a numerator <em>and</em> a denominator, and Redis will only ever hand you the counters you decided to keep. <code>dash:hour:{H}</code> is the denominator. The numerator does not exist yet, so you add one counter and one line to the writer:</p>
+
+  <pre><code>// keys.js — one addition
+hourFail:  (h)    =&gt; `dash:hourfail:${h}`,
+
+// writer.js — inside queueBooking, alongside tx.incr(K.hour(h))
+if (b.status !== 'Completed') tx.incr(K.hourFail(h));</code></pre>
+
+  <p>Then re-run <code>replay.js</code>, because a counter you add today starts at zero and knows nothing about the 15,000 bookings already in Mongo. That is the compute-on-write bargain in miniature, and Section 7 returns to it.</p>
+
+  <pre><code>// api.js — the rate is computed on read, from two O(1) counters
+const [hourTotals, hourFails] = await Promise.all([
+  redis.mGet(HOURS.map((h) =&gt; K.hour(h))),
+  redis.mGet(HOURS.map((h) =&gt; K.hourFail(h))),
+]);
+
+const MIN_BOOKINGS = 1000;                  // the gate — see below
+const hourly = HOURS.map((h) =&gt; {
+  const bookings = num(hourTotals[h]);
+  const failed   = num(hourFails[h]);
+  return {
+    hour: h,
+    bookings,
+    failed,
+    failure_rate: bookings ? Number((100 * failed / bookings).toFixed(2)) : null,
+    ranked: bookings &gt;= MIN_BOOKINGS,       // only these are comparable
+  };
+});
+
+// Worst hour — but only among hours that carry volume
+const worst = hourly
+  .filter((x) =&gt; x.ranked)
+  .sort((a, b) =&gt; b.failure_rate - a.failure_rate)[0];</code></pre>
+
+  <p>That <code>filter</code> is the whole lesson. Without it, the dashboard ranks by rate alone and reports the wrong hour with total confidence:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Hour</th><th>Bookings</th><th>Failure rate</th><th>Failed bookings</th><th>Comparable?</th></tr></thead>
+    <tbody>
+      <tr><td>03:00</td><td>46</td><td>43.48%</td><td>≈ 20</td><td>No — sample too small</td></tr>
+      <tr><td>07:00</td><td>637</td><td>41.60%</td><td>≈ 265</td><td>No</td></tr>
+      <tr><td>16:00</td><td>764</td><td>40.45%</td><td>≈ 309</td><td>No</td></tr>
+      <tr><td><strong>17:00</strong></td><td><strong>1,062</strong></td><td><strong>39.92%</strong></td><td>≈ 424</td><td><strong>Yes — worst of these</strong></td></tr>
+      <tr><td>18:00</td><td>1,373</td><td>37.14%</td><td>≈ 510</td><td>Yes — busiest hour</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Read that table before you believe any ranking.</strong> 03:00 has the highest failure rate in the dataset, and it is worthless: 43.48% of 46 bookings is about twenty failures across an entire year. One bad night moves that number four percentage points. Ranked by rate alone, your dashboard points operations at a dead hour.</p>
+    <p style="margin-top:.5rem">The honest finding is narrower and far more useful: <strong>the worst failure rate among the hours that actually carry volume is 17:00 at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062.</strong> That is a real operational signal: the hour just before peak is failing at a higher rate than peak itself, which points at supply positioning ahead of the evening rush rather than at capacity during it.</p>
+    <p style="margin-top:.5rem">Note the third column too. 18:00 produces <em>more</em> failed bookings in absolute terms (≈ 510 against ≈ 424) even at the lower rate. Rate tells you where the process is weakest; volume tells you where the money is. A dashboard that shows only one of them will be misread — which is exactly why the tile should carry the denominator next to the percentage.</p>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>The same guard in the MongoDB pipeline.</strong> You already know this one from Lecture 14: after the <code>$group</code> that computes bookings and failures per hour, insert <code>{ $match: { bookings: { $gte: 1000 } } }</code> before the <code>$sort</code>. One stage, and the small-sample hours stop competing. The difference is <em>where the guard lives</em>: in Mongo it sits in the query, so every consumer of that pipeline inherits it; in Redis it sits in whichever piece of application code happens to read the counters, so a second service reading the same keys can re-introduce the bug. Pre-computed metrics do not carry their own caveats — you have to.</p>
+  </div>
+
+  <h3>The Browser View</h3>
+  <p>A static page in <code>public/index.html</code>. Poll, repaint, nothing clever.</p>
+
+  <pre><code>&lt;div id="total"&gt;&lt;/div&gt;
+&lt;div id="revenue"&gt;&lt;/div&gt;
+&lt;div id="actives"&gt;&lt;/div&gt;
+&lt;ol id="vehicles"&gt;&lt;/ol&gt;
+&lt;ol id="pickups"&gt;&lt;/ol&gt;
+
+&lt;script&gt;
+const inr = (n) =&gt; '₹' + Number(n).toLocaleString('en-IN',
+                     { maximumFractionDigits: 0 });
+
+async function refresh() {
+  const res = await fetch('/api/dashboard?date=2024-03-14');
+  if (!res.ok) return;                       // keep the last good paint
+  const d = await res.json();
+
+  total.textContent    = d.total_bookings.toLocaleString('en-IN');
+  revenue.textContent  = inr(d.revenue_today);
+  actives.textContent  = d.active_customers.toLocaleString('en-IN');
+
+  vehicles.innerHTML = d.vehicle_revenue
+    .map((v) =&gt; `&lt;li&gt;${v.vehicle_type} — ${inr(v.revenue)}&lt;/li&gt;`).join('');
+  pickups.innerHTML = d.top_pickups
+    .map((p) =&gt; `&lt;li&gt;${p.pickup} — ${p.bookings}&lt;/li&gt;`).join('');
+}
+
+refresh();
+setInterval(refresh, 2000);
+&lt;/script&gt;</code></pre>
+
+  <pre><code># Two terminals
+node api.js                 # terminal 1 — http://localhost:3000
+node replay.js              # terminal 2 — watch the numbers climb
+
+curl -s localhost:3000/api/dashboard?date=2024-03-14 | head -c 400</code></pre>
+
+  <div class="callout">
+    <p><strong>Polling versus pushing.</strong> A two-second poll is the right call here: it is four lines of code, it survives a dropped connection without any reconnect logic, and the read costs almost nothing. Server-Sent Events or WebSockets become worthwhile when updates are genuinely sub-second or when thousands of clients would make polling expensive. Choose the simplest mechanism the latency requirement allows — the engineering fashion is not the requirement.</p>
+  </div>
+
+  <h2 id="retention">Section 6: Retention with Bitmaps</h2>
+
+  <p>Everything so far could have been done with ordinary counters. This is the part that could not.</p>
+
+  <p><strong>The business question:</strong> of the customers who booked on 13 March, how many came back on the 14th? Day-over-day retention is one of the few metrics that genuinely predicts the health of a marketplace, and it is expensive to compute the obvious way — a set of yesterday's customers, a set of today's, and an intersection over millions of identifiers.</p>
+
+  <pre><code># Two commands. That is the entire computation.
+BITOP AND dash:retained:2024-03-13:2024-03-14 \
+          dash:customers:2024-03-13 dash:customers:2024-03-14
+BITCOUNT  dash:retained:2024-03-13:2024-03-14</code></pre>
+
+  <pre><code>// api.js — exposed as an endpoint
+app.get('/api/retention', async (req, res, next) =&gt; {
+  try {
+    const { from, to } = req.query;            // ?from=2024-03-13&amp;to=2024-03-14
+    const dest = `dash:retained:${from}:${to}`;
+
+    await redis.bitOp('AND', dest, [K.customers(from), K.customers(to)]);
+    await redis.expire(dest, 300);             // a derived scratch key
+
+    const [returning, dayOne, dayTwo] = await Promise.all([
+      redis.bitCount(dest),
+      redis.bitCount(K.customers(from)),
+      redis.bitCount(K.customers(to)),
+    ]);
+
+    res.json({
+      from, to,
+      day_one_actives: dayOne,
+      day_two_actives: dayTwo,
+      returning,
+      retention_pct: dayOne ? Number((returning / dayOne * 100).toFixed(2)) : 0,
+      new_customers: dayTwo - returning,
+    });
+  } catch (err) { next(err); }
+});</code></pre>
+
+  <h3>The Memory Argument, Concretely</h3>
+  <div class="callout green">
+    <p>One bit per customer. <strong>1,000,000 customers = 1,000,000 bits ÷ 8 = 125,000 bytes ≈ 125 KB per day.</strong></p>
+    <p><code>BITOP AND</code> over two such keys is a bitwise AND across 125 KB of contiguous memory — the CPU compares <strong>64 customers per machine word</strong>. <code>BITCOUNT</code> is a hardware popcount over the result. Both complete in well under a millisecond.</p>
+    <p>A full year of daily keys is 365 × 125 KB ≈ <strong>45 MB</strong>. For that, you can compute retention between <em>any two days of the year</em>, on demand, with no pipeline and no scan.</p>
+  </div>
+
+  <p>Measure the same thing the other ways and the comparison is stark:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Approach</th><th>Memory / storage</th><th>Cost of one retention query</th><th>Exact?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bitmap</strong> + <code>BITOP AND</code></td><td>~125 KB per day</td><td>Two commands, sub-millisecond</td><td>Yes</td></tr>
+      <tr><td><strong>Redis Set</strong> + <code>SINTER</code></td><td>~60–80 MB per day</td><td>O(smaller set) — tens of milliseconds</td><td>Yes</td></tr>
+      <tr><td><strong>HyperLogLog</strong></td><td>12 KB per day</td><td><strong>Cannot do it</strong> — <code>PFMERGE</code> is union only</td><td>n/a</td></tr>
+      <tr><td><strong>MongoDB aggregation</strong></td><td>Already stored</td><td><code>$match</code> + <code>$group</code> + <code>$lookup</code> across two days of documents</td><td>Yes</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Two cautions before you ship this.</strong> First, <code>BITOP</code> writes a new key whose size equals the largest input — give it a short TTL, as above, or your scratch keys quietly become the biggest thing in memory. Second, the whole technique depends on a dense integer identity. <code>CID482910</code> gives us one; a UUID does not. Maintain an explicit <code>customer:offset</code> Hash with an <code>INCR</code> allocator, and <strong>never hash an ID into an offset</strong> — a collision makes two customers one and silently understates the count forever.</p>
+  </div>
+
+  <h2 id="compare">Section 7: Redis vs Atlas Charts — and the Limits</h2>
+
+  <p>You have now built the same dashboard twice. Same business questions, opposite engineering trade. Being able to articulate this table is the examinable skill of Module 4.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>MongoDB + Atlas Charts (L15–16)</th><th>Redis dashboard (today)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Freshness</strong></td><td>Minutes — Charts caches, and the pipeline runs on refresh</td><td><strong>Seconds</strong> — the counter moves as the booking lands</td></tr>
+      <tr><td><strong>Query cost</strong></td><td>Grows with the collection; repeated per viewer</td><td><strong>Constant</strong> — O(1)/O(log N), independent of volume</td></tr>
+      <tr><td><strong>Flexibility</strong></td><td><strong>Total.</strong> Any new question is a new pipeline, answered over all history immediately</td><td><strong>Zero.</strong> Only what you decided to track; a new metric needs code plus a backfill</td></tr>
+      <tr><td><strong>Memory</strong></td><td>Disk-based; the whole 15,000 documents retained</td><td>RAM-only; a few dozen keys, a few MB</td></tr>
+      <tr><td><strong>Durability</strong></td><td>Replicated, durable, point-in-time recoverable</td><td>Loses the last seconds of writes — acceptable <em>only</em> because it is derived</td></tr>
+      <tr><td><strong>Granularity</strong></td><td>Drill all the way down to the individual booking</td><td>Only the aggregate — the individual booking is not there</td></tr>
+      <tr><td><strong>Build effort</strong></td><td>Low — point Charts at a collection</td><td>Higher — writer, API, key schema, reconciliation job</td></tr>
+      <tr><td><strong>Best use</strong></td><td>Analysis, exploration, board reporting, anything retrospective</td><td>Operations screens, live monitoring, anything a hundred people watch at once</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>About the Reference Project</h3>
+  <p>The Redis Labs project this session is modelled on — <a href="https://github.com/redis-developer/basic-analytics-dashboard-redis-bitmaps-nodejs" target="_blank" rel="noopener">redis-developer/basic-analytics-dashboard-redis-bitmaps-nodejs</a> — is worth reading in full, and worth reading honestly.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Reference project</th><th>Our build</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Event</strong></td><td>A site visit</td><td>A ride booking</td></tr>
+      <tr><td><strong>Bitmap tracks</strong></td><td>Which visitors were seen on a date</td><td>Which customers booked on a date</td></tr>
+      <tr><td><strong>Dimensions</strong></td><td>Device, browser, traffic source</td><td>Vehicle type, pickup, status, payment method, hour</td></tr>
+      <tr><td><strong>Headline metric</strong></td><td>Unique visitors per period</td><td>Revenue, failure mix, daily actives, retention</td></tr>
+      <tr><td><strong>Shared idea</strong></td><td colspan="2"><strong>Increment on write; read pre-computed aggregates; use bitmaps for uniqueness at scale.</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Its web-analytics framing is the canonical use case — it is, after all, what Google Analytics does. Our substitution of bookings for page views changes nothing structural, which is the point: the pattern transfers across domains unchanged.</p>
+
+  <h3>The Limit You Just Bought</h3>
+  <div class="callout amber">
+    <p><strong>Redis gives you exactly the metrics you decided to track in advance — and nothing else.</strong></p>
+    <p>Tomorrow your Head of Operations asks: "What is the cancellation rate for eBike bookings from IGI Airport between 17:00 and 19:00?" In MongoDB that is one <code>$match</code> and one <code>$group</code>, answered in a minute over all of 2024. In Redis the answer does not exist. You must add a key — <code>dash:cancel:{vehicle}:{pickup}:{hour}</code> — change the writer, deploy it, and then <strong>backfill</strong> by replaying every historical booking. Until the backfill finishes, the tile shows a number that is wrong.</p>
+    <p>And note the second-order cost: that key pattern is a <em>combinatorial explosion</em>. Seven vehicle types × dozens of pickups × 24 hours is thousands of keys for one question. Pre-computation is cheap for a handful of known metrics and ruinous as a general strategy.</p>
+  </div>
+
+  <div class="callout green">
+    <p><strong>Which is exactly the trade you made, stated correctly:</strong> you exchanged flexibility for speed. That is a good trade for eight metrics watched continuously by an operations team, and a terrible one for an analyst exploring a hypothesis. Run both. <strong>Nobody chooses between MongoDB and Redis — they choose which questions go to which.</strong></p>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>Compute on write, not on read.</strong> MongoDB does the analytical work when somebody asks; Redis does it once when the booking arrives. The read then costs the same whether you have 15,000 bookings or 15,000,000.</li>
+      <li><strong>The key schema is the design document.</strong> Eight keys across five types — String, Hash, Sorted Set and Bitmap — written down in a table and owned by a single <code>keys.js</code> module, because Redis has no catalogue to recover it from.</li>
+      <li><strong>Guard every optional field.</strong> 5,657 of 15,000 bookings have no <code>booking_value</code> and no <code>payment_method</code>. One unguarded <code>INCRBYFLOAT</code> writes <code>NaN</code> and permanently poisons a counter that has no audit trail.</li>
+      <li><strong><code>MULTI</code>/<code>EXEC</code> buys consistency and throughput, not rollback.</strong> Eight updates become visible together and cost one round trip instead of eight — but a failing command does not undo the others.</li>
+      <li><strong>Two commands compute retention over a million customers.</strong> <code>BITOP AND</code> across two 125 KB daily bitmaps, then <code>BITCOUNT</code>. A year of daily keys is ~45 MB, and any two days can be compared on demand.</li>
+      <li><strong>You bought speed with flexibility.</strong> A new question needs a writer change, a deploy, and a backfill — and the pre-computed key space explodes combinatorially. Keep the system of record for everything you did not anticipate, and reconcile the counters against it on a schedule.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 19 — Project Presentations</h3>
+    <p>You present your end-to-end build: the <code>bdma.rides</code> data model from Module 2, the aggregation pipelines and Atlas Charts dashboard from Module 3, and the Redis speed layer from Module 4. Twelve minutes per team, plus questions. Come prepared to defend <strong>one design decision you would now make differently</strong> — and to say which of your metrics belongs in Redis, which belongs in MongoDB, and why.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture17/notes.html">← Lecture 17</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture19/notes.html">Lecture 19 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

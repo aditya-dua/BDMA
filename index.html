@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BDMA — Big Data Management &amp; Analytics</title>
+  <meta name="description" content="Big Data Management & Analytics — MBA elective. Non-relational databases, MongoDB, Atlas Charts and Redis, taught through a single real ride-analytics dataset." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-brand"><span class="dot"></span><span>BDMA</span></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="index.html" class="active">Lectures</a>
+      <a href="assignments.html">Assignments</a>
+      <a href="commands.html">Commands</a>
+      <a href="dashboard/index.html">Dashboard</a>
+      <a href="https://github.com/aditya-dua/BDMA">GitHub</a>
+    </div>
+    <span class="nav-tag">MBA Elective</span>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">Part 2 · Lectures 11–20</div>
+  <h1>Big Data Management<br />&amp; <span>Analytics</span></h1>
+  <p class="hero-sub">
+    Ten sessions on non-relational data. We model, query, index and visualise one real ride-booking
+    dataset in MongoDB, then rebuild the same dashboard in Redis — and argue about which was the
+    right choice.
+  </p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">10</div><div class="stat-lbl">Lectures</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-lbl">Modules</div></div>
+    <div class="stat"><div class="stat-num">15,000</div><div class="stat-lbl">Rows of data</div></div>
+    <div class="stat"><div class="stat-num">90</div><div class="stat-lbl">Min / session</div></div>
+  </div>
+</section>
+
+<main>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Part 1</span>
+      <span class="module-title">Relational Foundations &amp; SQL</span>
+      <span class="module-lectures">Lectures 1–10 · completed</span>
+    </div>
+    <div class="lectures-grid">
+      <div class="lecture-card past">
+        <div class="card-top">
+          <span class="lec-num">L01–L10</span>
+          <span class="status-badge past">Covered</span>
+        </div>
+        <div class="card-title">Relational Modelling, SQL &amp; the Data Warehouse</div>
+        <div class="card-sub">Normalisation, joins, transactions and analytical SQL — the baseline everything in Part 2 is measured against.</div>
+        <div class="card-footer">
+          <span class="card-duration">First half of semester</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Module 1</span>
+      <span class="module-title">Non-Relational Databases &amp; MongoDB 101</span>
+      <span class="module-lectures">Lectures 11–12</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 11</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Introduction to Non-Relational Databases</div>
+        <div class="card-sub">Why relational hit a wall, vertical vs horizontal scaling, CAP, ACID vs BASE, and the four NoSQL families.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO1</span>
+          <span class="card-links">
+            <a href="lecture11/notes.html">Notes</a>
+            <a href="lecture11/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 12</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">MongoDB 101 — The Document Model</div>
+        <div class="card-sub">BSON, collections, embedding vs referencing, schema design patterns, and loading your first Atlas collection.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO1</span>
+          <span class="card-links">
+            <a href="lecture12/notes.html">Notes</a>
+            <a href="lecture12/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Module 2</span>
+      <span class="module-title">MongoDB 201 — Querying, Indexing &amp; Aggregation</span>
+      <span class="module-lectures">Lectures 13–14</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 13</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Querying Data with MongoDB</div>
+        <div class="card-sub">Full CRUD in <code>mongosh</code>, query and update operators, projections, sorting, and handling absent fields.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO3</span>
+          <span class="card-links">
+            <a href="lecture13/notes.html">Notes</a>
+            <a href="lecture13/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 14</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Indexing &amp; the Aggregation Framework</div>
+        <div class="card-sub">B-tree indexes, the ESR rule, reading <code>explain()</code>, and building multi-stage pipelines that answer business questions.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO3</span>
+          <span class="card-links">
+            <a href="lecture14/notes.html">Notes</a>
+            <a href="lecture14/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Module 3</span>
+      <span class="module-title">Data Visualisation with Atlas Charts</span>
+      <span class="module-lectures">Lectures 15–16</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 15</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Atlas Charts &amp; the Ride-Analytics Problem</div>
+        <div class="card-sub">A real business brief: 37.71% of bookings fail. Build the first dashboard and find out where the money leaks.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO4</span>
+          <span class="card-links">
+            <a href="lecture15/notes.html">Notes</a>
+            <a href="lecture15/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 16</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Dashboard Storytelling &amp; the Recommendation</div>
+        <div class="card-sub">Cancellation deep-dive, the 17:00 insight, chart-choice discipline, and turning a dashboard into a decision.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO4</span>
+          <span class="card-links">
+            <a href="lecture16/notes.html">Notes</a>
+            <a href="lecture16/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Module 4</span>
+      <span class="module-title">Key-Value Databases &amp; Real-Time Analytics with Redis</span>
+      <span class="module-lectures">Lectures 17–18</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 17</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Redis &amp; the Key-Value Model</div>
+        <div class="card-sub">Strings, hashes, lists, sets, sorted sets, bitmaps and HyperLogLog — and why 1M users fit in 125 KB.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO2</span>
+          <span class="card-links">
+            <a href="lecture17/notes.html">Notes</a>
+            <a href="lecture17/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 18</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Building a Real-Time Analytics Dashboard</div>
+        <div class="card-sub">Compute-on-write instead of compute-on-read: a Node.js writer, a Redis key schema, and O(1) dashboard reads.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO2</span>
+          <span class="card-links">
+            <a href="lecture18/notes.html">Notes</a>
+            <a href="lecture18/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Module 5</span>
+      <span class="module-title">Project Presentations &amp; Course Wrap-Up</span>
+      <span class="module-lectures">Lectures 19–20</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 19</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Project Presentations I</div>
+        <div class="card-sub">The full project brief, the technical checklist, the grading rubric, and the run sheet for presentation day.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO5</span>
+          <span class="card-links">
+            <a href="lecture19/notes.html">Notes</a>
+            <a href="lecture19/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Lecture 20</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Project Presentations II &amp; Wrap-Up</div>
+        <div class="card-sub">Remaining teams, then the synthesis: compute-on-read vs compute-on-write, polyglot persistence, and where to go next.</div>
+        <div class="card-footer">
+          <span class="card-duration">90 min · CLO5</span>
+          <span class="card-links">
+            <a href="lecture20/notes.html">Notes</a>
+            <a href="lecture20/index.html">Slides</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="module-header">
+      <span class="module-num">Resources</span>
+      <span class="module-title">Course Materials</span>
+      <span class="module-lectures">Used throughout Modules 1–5</span>
+    </div>
+    <div class="lectures-grid">
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Dashboard</span>
+          <span class="status-badge available">Live</span>
+        </div>
+        <div class="card-title">Uber Ride Analytics Dashboard</div>
+        <div class="card-sub">The finished reference dashboard — KPIs, status mix, hourly demand, vehicle revenue and cancellation reasons.</div>
+        <div class="card-footer">
+          <span class="card-duration">Built in Lectures 15–16</span>
+          <span class="card-links"><a href="dashboard/index.html">Open</a></span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Reference</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">MongoDB &amp; Redis Command Reference</div>
+        <div class="card-sub">Every <code>mongosh</code> and <code>redis-cli</code> command used in the course, on one searchable page.</div>
+        <div class="card-footer">
+          <span class="card-duration">Quick reference</span>
+          <span class="card-links"><a href="commands.html">Open</a></span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Assessment</span>
+          <span class="status-badge available">Available</span>
+        </div>
+        <div class="card-title">Assignments &amp; Project Submission</div>
+        <div class="card-sub">Grading split, three assignments, the team project brief, rubrics and how to submit.</div>
+        <div class="card-footer">
+          <span class="card-duration">40% + 35% + 25%</span>
+          <span class="card-links"><a href="assignments.html">Open</a></span>
+        </div>
+      </div>
+
+      <div class="lecture-card available">
+        <div class="card-top">
+          <span class="lec-num">Dataset</span>
+          <span class="status-badge available">Download</span>
+        </div>
+        <div class="card-title">bdma.rides — 15,000 Ride Bookings</div>
+        <div class="card-sub">Delhi NCR, calendar year 2024. JSON for <code>mongoimport</code>, CSV for Charts, and a precomputed summary.</div>
+        <div class="card-footer">
+          <span class="card-duration">Seeded &amp; reproducible</span>
+          <span class="card-links">
+            <a href="data/uber_bookings.json">JSON</a>
+            <a href="data/uber_bookings.csv">CSV</a>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="commands.html">Commands</a> &nbsp;·&nbsp; <a href="dashboard/index.html">Dashboard</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+  <p>Companion course: <a href="https://sda.adityadua.com/">Streaming Data Analytics</a></p>
+</footer>
+
+</body>
+</html>
