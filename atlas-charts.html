@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rebuild It in Atlas Charts | BDMA</title>
+  <meta name="description" content="Take the ten aggregation pipelines behind the reference dashboard and rebuild the whole thing in MongoDB Atlas Charts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/notes.css" />
+  <link rel="stylesheet" href="assets/css/dashboard.css" />
+  <script src="assets/js/theme.js"></script>
+  <script src="assets/js/pipelines.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-brand"><span class="dot"></span><span>BDMA</span></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="index.html">Lectures</a>
+      <a href="assignments.html">Assignments</a>
+      <a href="commands.html">Commands</a>
+      <a href="dashboard/index.html">Dashboard</a>
+      <a href="atlas-charts.html" class="active">Atlas Charts</a>
+    </div>
+    <span class="nav-tag">Lectures 15–16</span>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<header class="dash-head">
+  <div class="dash-head-inner">
+    <h1>Rebuild It in <span>Atlas Charts</span></h1>
+    <p>
+      The reference dashboard is hand-drawn SVG, which makes it portable but teaches you nothing about
+      the tool this module is actually about. This page closes that gap. Every panel on that dashboard
+      is backed by an aggregation pipeline, and every one of those pipelines maps onto an Atlas Charts
+      chart. Run the query, read the shape, pick the encoding, repeat ten times — and you have the
+      same dashboard, built the way you would build it at work.
+    </p>
+    <div class="dash-chips">
+      <span class="dash-chip">bdma.rides</span>
+      <span class="dash-chip">10 pipelines</span>
+      <span class="dash-chip">9 charts + KPI row</span>
+      <span class="dash-chip grey">Lecture 15 lab</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="toc">
+    <strong>On this page</strong>
+    <ol>
+      <li><a href="#why">Why rebuild something that already works</a></li>
+      <li><a href="#setup">Getting the data into Atlas</a></li>
+      <li><a href="#source">Creating the Charts data source</a></li>
+      <li><a href="#charts">Nine charts and a KPI row</a></li>
+      <li><a href="#assemble">Assembling and embedding the dashboard</a></li>
+      <li><a href="#traps">Traps that cost people marks</a></li>
+    </ol>
+  </div>
+
+  <h2 id="why">Why rebuild something that already works</h2>
+
+  <p>
+    A fair question, and worth answering before you spend ninety minutes on it. The dashboard on this
+    site renders from a precomputed JSON file. That is a reasonable way to publish a result, but it is
+    a <em>snapshot</em>. It cannot be filtered, it cannot be drilled into, and the moment the underlying
+    data changes it is quietly wrong. Nobody in an operations meeting can ask it a follow-up question.
+  </p>
+
+  <p>
+    Atlas Charts is wired to the collection. Change the data and the chart changes. Add a filter and
+    every chart on the dashboard responds. That difference — snapshot versus live view — is most of
+    what separates a slide from a tool.
+  </p>
+
+  <div class="callout">
+    <p>
+      <strong>The real reason, though, is that it forces you to be explicit.</strong> A chart in Atlas
+      Charts is nothing but an aggregation plus an encoding: which field goes on which visual channel,
+      and how values are grouped. When you hand-draw a chart you can fudge that. When you build it in
+      Charts you cannot — the tool makes you name the field and name the aggregation. Most bad charts
+      are bad because nobody was ever forced to say those two things out loud.
+    </p>
+  </div>
+
+  <h2 id="setup">Getting the data into Atlas</h2>
+
+  <p>
+    You need the bookings in a real cluster. The free M0 tier is more than enough for fifteen thousand
+    documents. Download
+    <a href="data/uber_bookings.json"><code>data/uber_bookings.json</code></a>
+    from this site, then load it.
+  </p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>Create a free cluster</strong> if you have not already — this is the same M0 cluster from the Lecture 11 lab. Database <code>bdma</code>, collection <code>rides</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>Import the documents.</strong> From a terminal, with your own connection string:</p>
+      <pre><code>mongoimport --uri "mongodb+srv://USER:PASS@CLUSTER.mongodb.net/bdma" \
+  --collection rides \
+  --file uber_bookings.json \
+  --jsonArray</code></pre>
+      <p>If you would rather not install the database tools, the Atlas UI will take the same file: <strong>Browse Collections → Insert Document → import JSON</strong>. It is slower but it works from a locked-down laptop.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>Confirm the count before you go further.</strong> In <code>mongosh</code>, or the Atlas data explorer:</p>
+      <pre><code>db.rides.countDocuments()        // 15000
+db.rides.findOne()</code></pre>
+      <p>If you do not see exactly 15,000, stop and re-import. Every number on this site assumes that count, and a partial import produces charts that look plausible and are wrong — which is worse than charts that are obviously broken.</p>
+    </div>
+  </div>
+
+  <div class="callout amber">
+    <p>
+      <strong>Note the shape of a document before you build anything.</strong> <code>route.pickup</code>
+      is nested. <code>booked_at</code> is an ISO <em>string</em>, not a BSON date. And on a failed
+      booking, <code>booking_value</code>, <code>ratings</code> and <code>payment_method</code> are
+      <em>absent</em> — not null, absent. All three of those facts change how you write the pipelines
+      below, and all three are the reason the pipelines look the way they do.
+    </p>
+  </div>
+
+  <h2 id="source">Creating the Charts data source</h2>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p>In the Atlas sidebar open <strong>Charts</strong>, then <strong>Data Sources → Add Data Source</strong>. Pick your cluster, then <code>bdma.rides</code>. Charts samples the collection to infer a schema; give it a moment.</p>
+      <p>Check the inferred types in the field panel. <code>booked_at</code> should come through as a string. That is expected and correct — we extract the hour from it in the pipeline rather than relying on Charts to parse it.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <p>Create a dashboard: <strong>Dashboards → Add Dashboard</strong>. Call it <em>Uber Ride Analytics</em>. Every chart below goes on this one dashboard.</p>
+    </div>
+  </div>
+
+  <h2 id="charts">Nine charts and a KPI row</h2>
+
+  <p>
+    Each card below gives you the exact aggregation, the chart type to choose in Atlas, and which field
+    belongs on which encoding channel. The workflow is the same every time: <strong>Add Chart</strong>,
+    choose the data source, open the <strong>Query</strong> bar, paste the pipeline, then drag fields
+    onto the encoding channels.
+  </p>
+
+  <div class="callout blue">
+    <p>
+      <strong>Where the pipeline goes.</strong> Atlas Charts gives you a query bar above the chart
+      builder. It accepts either a plain <code>find</code> filter — <code>{ status: "Completed" }</code>
+      — or a full aggregation pipeline as an array. Paste the array exactly as shown, without the
+      surrounding <code>db.rides.aggregate(…)</code>. The copy button on each card gives you the
+      wrapped version for <code>mongosh</code>; strip the wrapper when pasting into Charts.
+    </p>
+    <p>
+      Once a pipeline is in the query bar, the fields it <em>outputs</em> are what you encode — not the
+      original document fields. After pasting the hourly pipeline you will see <code>hour</code>,
+      <code>bookings</code> and <code>failure_rate_pct</code> in the field list, because that is what
+      the <code>$project</code> emits.
+    </p>
+  </div>
+
+  <div class="dash-section-title">The headline numbers</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>KPI row</h3>
+      <p class="chart-sub">Six Number charts across the top of the dashboard, every one of them sharing a single pipeline.</p>
+      <div data-pipeline="kpis"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Where bookings end up</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Booking status mix</h3>
+      <p class="chart-sub">The first chart to build, and the one that frames everything after it.</p>
+      <div data-pipeline="status_breakdown"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Driver cancellation reasons</h3>
+      <p class="chart-sub">The largest single block of failure, broken into causes you could act on.</p>
+      <div data-pipeline="driver_reasons"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Demand across the day</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Demand and failure by hour</h3>
+      <p class="chart-sub">The hardest chart on the dashboard to build correctly, and the one carrying the finding.</p>
+      <div data-pipeline="by_hour"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>The volume floor</h3>
+      <p class="chart-sub">A second, smaller chart whose only job is to prove the first one is not reading noise.</p>
+      <div data-pipeline="hourly_volume_floor"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">The year in shape</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Monthly bookings and revenue</h3>
+      <p class="chart-sub">Context for everything else: is the problem getting worse, or has it always been this way?</p>
+      <div data-pipeline="by_month"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Product and payment mix</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Revenue by vehicle type</h3>
+      <p class="chart-sub">Where the money actually comes from, which is not where the rides come from.</p>
+      <div data-pipeline="by_vehicle"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Payment method mix</h3>
+      <p class="chart-sub">A simple chart with one genuinely necessary filter.</p>
+      <div data-pipeline="payment_methods"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Geography and customer voice</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Top pickup points</h3>
+      <p class="chart-sub">Where demand concentrates, and where it leaks.</p>
+      <div data-pipeline="top_pickups"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Customer cancellation reasons</h3>
+      <p class="chart-sub">Smaller than the driver side, but more diagnostic.</p>
+      <div data-pipeline="customer_reasons"></div>
+    </div>
+  </div>
+
+  <h2 id="assemble">Assembling and embedding the dashboard</h2>
+
+  <p>
+    Charts drop onto the dashboard in the order you create them, which is almost never the order a
+    reader needs. Rearrange them into an argument, the way Lecture 16 sets out: the KPI row first so the
+    reader knows the scale, then the status mix so they know the problem exists, then the hourly chart
+    and its volume floor so they know <em>when</em>, then cancellation reasons so they know <em>why</em>,
+    and geography last so they know <em>where to start</em>.
+  </p>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <p><strong>Add a dashboard filter.</strong> Charts lets you define a filter that applies across every chart at once — <code>vehicle_type</code> is the useful one here. Being able to ask &ldquo;does this pattern hold for Uber XL alone?&rdquo; in one click is exactly the follow-up question a static image cannot answer.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body">
+      <p><strong>Enable embedding</strong> if you want the dashboard on a web page: <strong>dashboard menu → Embed → Enable unauthenticated access</strong>, which gives you an <code>&lt;iframe&gt;</code> snippet.</p>
+      <p>Understand what you just did before you use it in anything real. Unauthenticated embedding makes the <em>aggregated output</em> publicly readable to anyone with the link. For this synthetic dataset that is harmless. For real booking data it would be a disclosure incident. Production embeds use authenticated embedding with a signed JWT and per-user filters.</p>
+    </div>
+  </div>
+
+  <div class="callout green">
+    <p>
+      <strong>Check your numbers against this site before you submit.</strong> Your status mix should
+      read 9,343 completed and 2,698 driver cancellations. Your hourly chart should peak at 1,373
+      bookings at 18:00. Your volume-floor chart should put 17:00 on top at 39.92%. If any of those
+      disagree, the pipeline is not what you think it is — and finding out why is the actual exercise.
+    </p>
+  </div>
+
+  <h2 id="traps">Traps that cost people marks</h2>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Trap</th>
+          <th>What it looks like</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Averaging over absent fields</strong></td>
+          <td>Average fare looks right but is computed over 15,000 documents instead of 9,343</td>
+          <td><code>$avg</code> skips missing values, so the <em>average</em> is fine — but any <code>$sum ÷ count</code> you write yourself is not. Divide by <code>completed_bookings</code>, never by <code>total_bookings</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Ranking a rate with no volume floor</strong></td>
+          <td>&ldquo;Our worst hour is 03:00 at 43.48%&rdquo; — on 46 bookings all year</td>
+          <td>Add <code>{ $match: { bookings: { $gte: 1000 } } }</code> <em>after</em> the <code>$project</code>, and say the threshold out loud on the chart.</td>
+        </tr>
+        <tr>
+          <td><strong>One axis for two units</strong></td>
+          <td>The failure-rate line sits flat along the bottom of the hourly chart</td>
+          <td>Customize → Series → <code>failure_rate_pct</code> → Axis → Right.</td>
+        </tr>
+        <tr>
+          <td><strong>Rounding inside the pipeline</strong></td>
+          <td>Your chart shows 40.44% where this site shows 40.45%</td>
+          <td>Drop <code>$round</code>. MongoDB breaks ties to even, most display layers round half up, and the two disagree in the last digit. Format in the chart.</td>
+        </tr>
+        <tr>
+          <td><strong>Counting <em>failed</em> as <em>cancelled</em></strong></td>
+          <td>Pickup cancellation rates come out around 39% instead of 33%</td>
+          <td>Incomplete rides travelled and earned a fare. They failed, but they were not cancelled. Decide which question you are answering and label the column accordingly.</td>
+        </tr>
+        <tr>
+          <td><strong>Truncated value axis</strong></td>
+          <td>A three-point difference between vehicle types looks like a cliff</td>
+          <td>Start value axes at zero unless you have a stated reason not to, and if you do not, say so on the chart.</td>
+        </tr>
+        <tr>
+          <td><strong>A donut with twelve slices</strong></td>
+          <td>Pickup locations rendered as a pie nobody can read</td>
+          <td>Donuts are for five categories or fewer where share is the question. Everything else is a bar chart.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="preview-box">
+    <strong>Where this goes next</strong>
+    <p>
+      Lecture 16 takes the finished dashboard and asks whether it survives contact with a sceptical
+      reader: is 17:00 a real pattern or an artifact, what would falsify it, and what single
+      recommendation does it support. A dashboard that cannot answer those three questions is
+      decoration. Bring yours.
+    </p>
+  </div>
+
+  <div class="page-nav">
+    <a href="dashboard/index.html">← The reference dashboard</a>
+    <a href="lecture15/notes.html">Lecture 15 notes</a>
+    <a href="lecture16/notes.html">Lecture 16 notes →</a>
+  </div>
+
+</div>
+
+<footer>
+  <p>BDMA — Big Data Management &amp; Analytics · Lectures 11–20</p>
+</footer>
+
+<script src="assets/js/pipeline-ui.js"></script>
+</body>
+</html>
