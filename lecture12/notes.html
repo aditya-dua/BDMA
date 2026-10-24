@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 12 — MongoDB 101: The Document Model | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 12 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 1</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 1 · Lecture 12</div>
+  <h1>MongoDB 101: The Document Model</h1>
+  <p class="subtitle">Documents, BSON, <code>_id</code>, flexible schema — and the one modelling decision that determines whether your database is fast or miserable</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO1</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 11 — a running Atlas M0 cluster and your connection string</span>
+    <span>🔧 <strong>Lab:</strong> Connect with Compass + mongosh, import the <code>rides</code> dataset</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#hierarchy">From Rows to Documents</a></li>
+      <li><a href="#bson">BSON — Why Not Just JSON</a></li>
+      <li><a href="#id">The <code>_id</code> Field and the ObjectId</a></li>
+      <li><a href="#schema">Flexible Schema and the Discipline It Demands</a></li>
+      <li><a href="#embed">Embedding vs Referencing — The Central Decision</a></li>
+      <li><a href="#connect">Connecting: mongosh, Compass, Drivers</a></li>
+      <li><a href="#lab">Hands-On — Load the Course Dataset</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Describe a MongoDB document and map the deployment → database → collection → document → field hierarchy onto the relational model you already know</li>
+    <li><span class="check">✓</span> Explain why MongoDB stores BSON rather than JSON, and name the types BSON adds</li>
+    <li><span class="check">✓</span> Decompose an <code>ObjectId</code> into its three components and explain why it is safe to generate on the client</li>
+    <li><span class="check">✓</span> State accurately what "flexible schema" does and does not guarantee, and apply <code>$jsonSchema</code> validation to re-tighten a collection</li>
+    <li><span class="check">✓</span> Decide between embedding and referencing for a given relationship, citing access pattern, size bound, and change frequency</li>
+    <li><span class="check">✓</span> Recognise the 16 MB document limit and the unbounded-array anti-pattern before they reach production</li>
+    <li><span class="check">✓</span> Connect to Atlas with both Compass and <code>mongosh</code>, and import 15,000 ride documents into the <code>bdma.rides</code> collection</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–6 min</td><td>Recap</td><td>Lecture 11 in one slide; confirm everyone's Atlas cluster is live</td></tr>
+      <tr><td>6–18 min</td><td>The Hierarchy</td><td>Document, collection, database — mapped to table/row/column and where the analogy breaks</td></tr>
+      <tr><td>18–30 min</td><td>BSON</td><td>Why binary, which types it adds, and the business cost of untyped storage</td></tr>
+      <tr><td>30–40 min</td><td><code>_id</code> &amp; ObjectId</td><td>The 12-byte anatomy; client-side generation; time-sortability</td></tr>
+      <tr><td>40–52 min</td><td>Flexible Schema</td><td>What it buys, what it costs, and <code>$jsonSchema</code> validation as the counterweight</td></tr>
+      <tr><td>52–72 min</td><td>Embed vs Reference</td><td>The core decision, the 16 MB limit, the unbounded-array trap, worked examples</td></tr>
+      <tr><td>72–86 min</td><td>Lab</td><td>Compass + <code>mongosh</code>, <code>insertOne</code>, <code>find</code>, then <code>mongoimport</code> of 15,000 rides</td></tr>
+      <tr><td>86–90 min</td><td>Wrap-Up</td><td>Verify counts, assignment reminder, Lecture 13 preview</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="hierarchy">Section 1: From Rows to Documents</h2>
+
+  <p>In Lecture 11 we argued that document databases exist because applications think in nested objects and tables do not. This lecture makes that concrete. The unit of storage in MongoDB is the <strong>document</strong>: an ordered set of field-and-value pairs, where a value may itself be a document or an array of documents.</p>
+
+  <p>Here is one real record from the dataset you will load today — a completed booking from the Delhi NCR ride-hailing data.</p>
+
+  <pre><code>{
+  _id: ObjectId("65f1a2c4e8b9d4a1c2f30142"),
+  booking_id: "CNR3000142",
+  booked_at: ISODate("2024-03-14T18:22:07Z"),
+  date: "2024-03-14",
+  status: "Completed",
+  customer_id: "CID482910",
+  vehicle_type: "Go Sedan",
+  route: { pickup: "Connaught Place", drop: "Aerocity" },
+  avg_vtat: 7.4,
+  avg_ctat: 31.2,
+  booking_value: 412.50,
+  ride_distance: 18.4,
+  ratings: { driver: 4.6, customer: 4.8 },
+  payment_method: "UPI"
+}</code></pre>
+
+  <p>Note what has happened. In a relational design this booking would be spread across a <code>bookings</code> table, a <code>routes</code> table, and a <code>ratings</code> table, joined on every read. Here it is one object, retrieved in one operation, in exactly the shape the application wants to display.</p>
+
+  <h3>The Four-Level Hierarchy</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Level</th><th>MongoDB</th><th>Relational Equivalent</th><th>In Our Course</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>Deployment</strong> (cluster)</td><td>Database server / instance</td><td>Your Atlas M0 cluster</td></tr>
+      <tr><td>2</td><td><strong>Database</strong></td><td>Database / schema</td><td><code>bdma</code></td></tr>
+      <tr><td>3</td><td><strong>Collection</strong></td><td>Table</td><td><code>rides</code></td></tr>
+      <tr><td>4</td><td><strong>Document</strong></td><td>Row</td><td>One booking, e.g. <code>CNR3000142</code></td></tr>
+      <tr><td>5</td><td><strong>Field</strong></td><td>Column</td><td><code>booking_value</code>, <code>route.pickup</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Where the analogy breaks — and it matters:</strong></p>
+    <p><strong>1. A collection has no fixed columns.</strong> A table declares its columns once, for every row. A collection declares nothing. Two documents in <code>rides</code> may carry entirely different field sets — and in our dataset they genuinely do.</p>
+    <p><strong>2. A field value can be a whole structure.</strong> <code>route</code> is not a string; it is a sub-document with its own fields. <code>ratings</code> is another. A relational column holds one scalar, full stop.</p>
+    <p><strong>3. Collections are created lazily.</strong> Writing to <code>db.rides</code> creates the collection if it does not exist. There is no <code>CREATE TABLE</code> step and no migration ceremony.</p>
+  </div>
+
+  <h3>Different Shapes in One Collection</h3>
+  <p>Our dataset is deliberately realistic: a booking that never completed does not have a fare, a distance, or ratings, because those facts never came into existence. Compare the completed document above with a cancelled one:</p>
+
+  <pre><code>{
+  booking_id: "CNR3004193",
+  booked_at: ISODate("2024-01-01T13:00:56Z"),
+  date: "2024-01-01",
+  status: "Cancelled by Driver",
+  customer_id: "CID695170",
+  vehicle_type: "Premier Sedan",
+  route: { pickup: "New Delhi Railway Station", drop: "Anand Vihar ISBT" },
+  avg_vtat: 2.84,
+  cancellation: { by: "driver", reason: "Personal &amp; Car related issues" }
+}</code></pre>
+
+  <p>No <code>booking_value</code>. No <code>ride_distance</code>. No <code>ratings</code>. No <code>payment_method</code>. Instead there is a <code>cancellation</code> sub-document that the completed booking does not have.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Status</th><th>Count</th><th>Share</th><th>Fields Present Beyond the Common Core</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Completed</strong></td><td>9,343</td><td>62.29%</td><td><code>avg_vtat</code>, <code>avg_ctat</code>, <code>booking_value</code>, <code>ride_distance</code>, <code>ratings</code>, <code>payment_method</code></td></tr>
+      <tr><td><strong>Cancelled by Driver</strong></td><td>2,698</td><td>17.99%</td><td><code>avg_vtat</code>, <code>cancellation</code></td></tr>
+      <tr><td><strong>No Driver Found</strong></td><td>1,036</td><td>6.91%</td><td>none — not even <code>avg_vtat</code></td></tr>
+      <tr><td><strong>Cancelled by Customer</strong></td><td>1,022</td><td>6.81%</td><td><code>avg_vtat</code>, <code>cancellation</code></td></tr>
+      <tr><td><strong>Incomplete</strong></td><td>901</td><td>6.01%</td><td><code>avg_vtat</code>, <code>avg_ctat</code>, <code>booking_value</code>, <code>ride_distance</code>, <code>payment_method</code>, <code>incomplete</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Business framing:</strong> in a relational table these 15,000 rows would need roughly six nullable columns and two nullable sub-tables, and every analyst query would have to remember which <code>NULL</code> means "did not happen" and which means "we failed to record it". In the document model the <em>absence</em> of <code>booking_value</code> is itself the signal: no fare exists because no ride happened. Lecture 13 turns that into a query with <code>$exists</code>.</p>
+  </div>
+
+  <h2 id="bson">Section 2: BSON — Why Not Just JSON</h2>
+
+  <p>You write JSON. MongoDB stores <strong>BSON</strong> — Binary JSON. The difference is invisible most of the time and decisive the rest of the time.</p>
+
+  <p>JSON is a text format designed for humans and for interchange. It has exactly six types: string, number, boolean, null, array, object. That is fine for sending data over a wire. It is inadequate for a database, for three reasons.</p>
+
+  <h3>Reason 1 — JSON Has No Real Types</h3>
+  <p>In JSON, <code>412.50</code> is just "a number". Is it a 32-bit integer? A 64-bit integer? A float? An exact decimal suitable for money? JSON does not say, so every reader has to guess — and different languages guess differently. BSON records the type explicitly on every value.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>BSON Type</th><th>What It Solves</th><th>Where It Appears in <code>rides</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>ObjectId</code></td><td>A compact, globally unique, roughly time-ordered 12-byte key</td><td><code>_id</code> on every document</td></tr>
+      <tr><td><code>Date</code></td><td>A real timestamp (ms since epoch), sortable and range-queryable</td><td><code>booked_at</code>, once converted from its ISO string</td></tr>
+      <tr><td><code>Int32</code> / <code>Int64</code></td><td>Exact integers that never drift into floating point</td><td>Counts and derived hour-of-day values</td></tr>
+      <tr><td><code>Double</code></td><td>Standard 64-bit float</td><td><code>ride_distance</code>, <code>avg_vtat</code>, <code>ratings.driver</code></td></tr>
+      <tr><td><code>Decimal128</code></td><td>Exact decimal arithmetic — no <code>0.1 + 0.2</code> surprises</td><td>What <code>booking_value</code> <em>should</em> be in a real billing system</td></tr>
+      <tr><td><code>Binary</code></td><td>Raw bytes: images, hashes, encrypted blobs</td><td>Not used here; common for documents and KYC images</td></tr>
+      <tr><td><code>Null</code> vs missing</td><td>Two distinct states: "known to be nothing" vs "not recorded"</td><td>Our dataset uses <em>missing</em>, deliberately</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Why an MBA should care about <code>Decimal128</code>:</strong> a <code>Double</code> cannot represent ₹0.10 exactly. Sum 9,343 fares stored as doubles and the total drifts by fractions of a paisa. On a 15,000-row teaching dataset that is harmless. On a payments ledger processing millions of transactions a day, it is an audit finding. Money gets <code>Decimal128</code>; distances and ratings are fine as doubles.</p>
+  </div>
+
+  <h3>Reason 2 — BSON Is Traversable</h3>
+  <p>Every BSON element is prefixed with its length. That means the database can skip over a field it does not need instead of parsing the whole document character by character. When you ask for <code>route.pickup</code> from a document with fourteen fields, the storage engine jumps straight to it. On 15,000 documents the saving is small; on 150 million it is the difference between a two-second query and a two-minute one.</p>
+
+  <h3>Reason 3 — BSON Preserves Field Order</h3>
+  <p>JSON object key order is formally undefined. BSON guarantees it, which is what makes compound index key ordering and certain comparison semantics deterministic.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>JSON</th><th>BSON</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Form</strong></td><td>Text</td><td>Binary</td></tr>
+      <tr><td><strong>Readable by humans</strong></td><td>Yes</td><td>No — tools render it as JSON for you</td></tr>
+      <tr><td><strong>Type system</strong></td><td>6 types</td><td>~20 types including dates, decimals, binary, ObjectId</td></tr>
+      <tr><td><strong>Field order</strong></td><td>Undefined</td><td>Preserved</td></tr>
+      <tr><td><strong>Space</strong></td><td>Compact for small text</td><td>Slightly larger (length prefixes) but far faster to traverse</td></tr>
+      <tr><td><strong>Where you meet it</strong></td><td>What you type, what APIs return</td><td>What is on disk and on the wire</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The practical rule:</strong> you think and write in JSON; the driver converts to BSON on the way in and back on the way out. The only time the distinction surfaces is when you need a type JSON cannot express — a date, a decimal, or an <code>ObjectId</code> — and then you must say so explicitly. We do exactly that in the lab when converting <code>booked_at</code> from a string into a real <code>Date</code>.</p>
+  </div>
+
+  <h2 id="id">Section 3: The <code>_id</code> Field and the ObjectId</h2>
+
+  <p>Every document in every MongoDB collection has an <code>_id</code> field. It is the primary key, it is unique within the collection, and it is indexed automatically — you cannot drop that index. If you insert a document without an <code>_id</code>, the driver generates one for you, and by default it is an <code>ObjectId</code>.</p>
+
+  <h3>Anatomy of an ObjectId — 12 Bytes</h3>
+  <pre><code>ObjectId("65f1a2c4  e8b9d4a1c2  f30142")
+          --------  ----------  ------
+          |         |           |
+          |         |           +-- 3 bytes: counter, starts at a random
+          |         |                value, increments per process
+          |         +-- 5 bytes: random value, unique per machine+process
+          +-- 4 bytes: seconds since the Unix epoch (creation time)</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Bytes</th><th>Content</th><th>Consequence</th></tr></thead>
+    <tbody>
+      <tr><td><strong>0–3</strong></td><td>Unix timestamp in seconds</td><td>Sorting by <code>_id</code> is approximately sorting by creation time — for free, with no extra index</td></tr>
+      <tr><td><strong>4–8</strong></td><td>Random per-process value</td><td>Two application servers generating IDs at the same instant will not collide</td></tr>
+      <tr><td><strong>9–11</strong></td><td>Incrementing counter</td><td>The same process generating thousands of IDs in one second stays unique</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Why This Design Matters Commercially</h3>
+  <p>A relational <code>AUTO_INCREMENT</code> key requires a round trip to the database: the application must insert, wait, and read back the assigned ID. That works on one server. On twenty application servers writing to a sharded cluster it becomes a global coordination bottleneck — a single counter everyone must queue behind.</p>
+
+  <p>An <code>ObjectId</code> is generated <strong>client-side, with no coordination at all</strong>, and is still unique. The application can construct a whole object graph, assign IDs, and write it in one batch. That is a throughput property, not a cosmetic one.</p>
+
+  <pre><code>// The timestamp is extractable — no separate created_at needed
+const id = ObjectId("65f1a2c4e8b9d4a1c2f30142")
+id.getTimestamp()        // ISODate("2024-03-13T10:34:12Z")
+
+// Which means you can range-query on _id alone
+db.rides.find({ _id: { $gt: ObjectId("65f1a2c400000000 00000000") } })</code></pre>
+
+  <h3>You May Supply Your Own <code>_id</code></h3>
+  <p><code>_id</code> does not have to be an <code>ObjectId</code>. It can be any unique value: a string, an integer, even a sub-document. In our dataset every booking already carries a natural key — <code>booking_id</code> — so a defensible design would be:</p>
+
+  <pre><code>db.rides.insertOne({
+  _id: "CNR3000142",          // natural key as the primary key
+  status: "Completed",
+  vehicle_type: "Go Sedan",
+  route: { pickup: "Connaught Place", drop: "Aerocity" }
+})</code></pre>
+
+  <div class="callout">
+    <p><strong>Trade-off:</strong> using the natural key saves 12 bytes and a redundant index, and makes <code>_id</code> meaningful to a human reading the data. It costs you the free time-ordering an <code>ObjectId</code> provides, and it breaks badly if the business ever reissues a booking reference. We keep the generated <code>ObjectId</code> and leave <code>booking_id</code> as an ordinary indexed field — the conventional choice.</p>
+  </div>
+
+  <h2 id="schema">Section 4: Flexible Schema and the Discipline It Demands</h2>
+
+  <p>"Schemaless" is the single most damaging word in the NoSQL vocabulary. MongoDB collections are not schemaless. They are <strong>schema-flexible</strong>: the schema is not declared to the database up front, but it absolutely still exists — in your application code, in your analysts' queries, and in your dashboards.</p>
+
+  <h3>What Flexibility Genuinely Buys You</h3>
+  <ul>
+    <li><strong>Additive change with no downtime.</strong> Adding a <code>surge_multiplier</code> field to new bookings requires no <code>ALTER TABLE</code> and no maintenance window. Old documents simply do not have it.</li>
+    <li><strong>Heterogeneity that reflects reality.</strong> A cancelled booking and a completed one are genuinely different objects. Forcing them into identical columns is a modelling lie that someone eventually has to untangle.</li>
+    <li><strong>Faster iteration under uncertainty.</strong> When you do not yet know what the final record looks like — which is most of the time in a new product — you are not paying migration cost for every guess.</li>
+  </ul>
+
+  <h3>What It Costs You</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Risk</th><th>How It Shows Up</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Silent typos</strong></td><td>One service writes <code>payment_method</code>, another writes <code>paymentMethod</code>. Both succeed. Reports quietly undercount.</td><td>Schema validation + code review</td></tr>
+      <tr><td><strong>Type drift</strong></td><td><code>booking_value</code> arrives as <code>412.5</code> from one path and <code>"412.5"</code> from another. Range queries silently skip the strings.</td><td><code>bsonType</code> in the validator</td></tr>
+      <tr><td><strong>Archaeology</strong></td><td>Nobody knows what fields exist. Every new analyst starts by sampling documents.</td><td>Documented schema; Compass's Schema tab</td></tr>
+      <tr><td><strong>Query complexity</strong></td><td>Every aggregation must defend against missing fields.</td><td>Deliberate, documented absence rules</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Re-Tightening: <code>$jsonSchema</code> Validation</h3>
+  <p>MongoDB lets you attach a validator to a collection. It is opt-in, it can be as strict or as loose as you like, and it can be tightened progressively as a product matures. This is the professional answer to "flexible schema is dangerous": you choose, per collection, where on the spectrum to sit.</p>
+
+  <pre><code>db.createCollection("rides", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["booking_id", "booked_at", "status", "customer_id",
+                 "vehicle_type", "route"],
+      properties: {
+        booking_id: {
+          bsonType: "string",
+          pattern: "^CNR[0-9]{7}$",
+          description: "must match CNR followed by 7 digits"
+        },
+        booked_at: { bsonType: "date" },
+        status: {
+          enum: ["Completed", "Cancelled by Driver", "Cancelled by Customer",
+                 "No Driver Found", "Incomplete"],
+          description: "must be one of the five known booking outcomes"
+        },
+        vehicle_type: {
+          enum: ["Go Mini", "Go Sedan", "Auto", "eBike", "Bike",
+                 "Premier Sedan", "Uber XL"]
+        },
+        route: {
+          bsonType: "object",
+          required: ["pickup", "drop"],
+          properties: {
+            pickup: { bsonType: "string" },
+            drop:   { bsonType: "string" }
+          }
+        },
+        booking_value: { bsonType: ["double", "int"], minimum: 0 },
+        ride_distance: { bsonType: ["double", "int"], minimum: 0 },
+        ratings: {
+          bsonType: "object",
+          properties: {
+            driver:   { bsonType: "double", minimum: 1, maximum: 5 },
+            customer: { bsonType: "double", minimum: 1, maximum: 5 }
+          }
+        }
+      }
+    }
+  },
+  validationLevel: "moderate",
+  validationAction: "error"
+})</code></pre>
+
+  <p>Read that validator as a business contract. It says: every booking must have an ID in the house format, a real timestamp, one of five known outcomes, one of seven vehicle types, and a route with both ends. It says nothing at all about <code>booking_value</code> being required — because for 5,657 of our 15,000 bookings it legitimately does not exist.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Setting</th><th>Options</th><th>When to Use Which</th></tr></thead>
+    <tbody>
+      <tr><td><code>validationLevel</code></td><td><code>off</code> · <code>moderate</code> · <code>strict</code></td><td><code>moderate</code> checks inserts and updates to <em>already-valid</em> documents only — the right setting when retrofitting rules onto legacy data</td></tr>
+      <tr><td><code>validationAction</code></td><td><code>error</code> · <code>warn</code></td><td>Start with <code>warn</code> to measure how much existing data would fail, then switch to <code>error</code> once the backlog is clean</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The managerial line to remember:</strong> relational databases force the strictness decision on day one, before you know the answer. MongoDB lets you defer it and then apply exactly as much as the business actually needs — but <em>somebody has to make that decision deliberately</em>. A team that never writes a validator has not chosen flexibility; it has chosen neglect.</p>
+  </div>
+
+  <h2 id="embed">Section 5: Embedding vs Referencing — The Central Decision</h2>
+
+  <p>Everything else in this lecture is vocabulary. This section is the actual skill. In a relational database the model is largely dictated by normalisation rules. In MongoDB <em>you</em> decide, for every relationship, whether the related data lives inside the parent document or in a separate collection pointed at by an identifier. Get it right and reads are single-operation and fast. Get it wrong and you have rebuilt a slow relational database with none of the safety.</p>
+
+  <h3>Embedding</h3>
+  <p>The related data is stored inside the parent document. Our <code>route</code> and <code>ratings</code> fields are embedded sub-documents.</p>
+
+  <pre><code>{
+  booking_id: "CNR3000142",
+  status: "Completed",
+  route:   { pickup: "Connaught Place", drop: "Aerocity" },
+  ratings: { driver: 4.6, customer: 4.8 }
+}
+// One query returns everything. No join. Atomic single-document write.</code></pre>
+
+  <h3>Referencing</h3>
+  <p>The related data lives elsewhere and the parent stores a pointer. Our <code>customer_id</code> is a reference to a separate <code>customers</code> collection.</p>
+
+  <pre><code>// bdma.rides
+{ booking_id: "CNR3000142", customer_id: "CID482910", status: "Completed" }
+
+// bdma.customers
+{ _id: "CID482910", name: "Priya Sharma", phone: "+91-98xxxxxx21",
+  home_city: "Delhi", joined: ISODate("2022-06-11T00:00:00Z") }
+// Two queries, or one $lookup in an aggregation (Lecture 14).</code></pre>
+
+  <h3>The Rule of Thumb</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Test</th><th>Embed when…</th><th>Reference when…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Access pattern</strong></td><td>The data is almost always read <em>together</em> with the parent</td><td>The data is usually needed on its own, or only occasionally with the parent</td></tr>
+      <tr><td><strong>Size</strong></td><td>The embedded part is small and <strong>bounded</strong> — you can state a maximum</td><td>It is large, or grows without a natural limit</td></tr>
+      <tr><td><strong>Change frequency</strong></td><td>It changes <em>with</em> the parent, in the same business event</td><td>It changes independently, on its own lifecycle</td></tr>
+      <tr><td><strong>Sharing</strong></td><td>It belongs to exactly one parent</td><td>Many parents refer to the same entity</td></tr>
+      <tr><td><strong>Cardinality</strong></td><td>One-to-one, or one-to-few (tens)</td><td>One-to-many (thousands) or many-to-many</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>The compressed version:</strong> <em>embed what is read together, bounded, and changes together. Reference what is large, unbounded, shared, or changes independently.</em> If a relationship satisfies some tests and not others, let <strong>access pattern</strong> win — it is the one your users feel.</p>
+  </div>
+
+  <h3>Applying It to Our Dataset</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Relationship</th><th>Decision</th><th>Reasoning</th></tr></thead>
+    <tbody>
+      <tr><td>Booking → route (pickup, drop)</td><td><strong>Embed</strong></td><td>Exactly two fields, never read without the booking, fixed at booking time and never updated</td></tr>
+      <tr><td>Booking → ratings</td><td><strong>Embed</strong></td><td>Two scalars, bounded, written once at trip end, meaningless outside the booking</td></tr>
+      <tr><td>Booking → cancellation reason</td><td><strong>Embed</strong></td><td>One sub-document, present only when relevant, part of the same event</td></tr>
+      <tr><td>Booking → customer</td><td><strong>Reference</strong></td><td>One customer has hundreds of bookings; a phone-number change must not require rewriting every historical ride</td></tr>
+      <tr><td>Booking → driver</td><td><strong>Reference</strong></td><td>Same reason, plus driver records carry licences and documents that no booking needs</td></tr>
+      <tr><td>Customer → all their bookings</td><td><strong>Reference</strong> (from the booking side)</td><td>Unbounded — a daily commuter generates 500 rides a year, forever</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The hybrid pattern (extended reference):</strong> you may embed a <em>snapshot</em> of a few referenced fields to avoid the join, while keeping the reference for the full record. Storing <code>customer: { id: "CID482910", name: "Priya S." }</code> on each booking lets a trip-history screen render with no second query. The deliberate trade-off is that if the customer changes their name, historical bookings keep the old one — which for an invoice or a receipt is arguably <em>correct</em>, not a bug.</p>
+  </div>
+
+  <h3>The Hard Limit: 16 MB per Document</h3>
+  <p>A single BSON document may not exceed <strong>16 megabytes</strong>. This is not a tuning parameter; it cannot be raised. It exists to stop any one document from monopolising memory and network bandwidth.</p>
+
+  <p>16 MB is enormous for a booking — our documents are roughly 300 bytes each, so the entire 15,000-record dataset is about 4.5 MB. You will never hit the limit with well-modelled data. You will hit it instantly with badly modelled data, and that is the point of the limit: <strong>it is a design smoke alarm.</strong></p>
+
+  <h3>The Unbounded Array Anti-Pattern</h3>
+  <p>This is the single most common modelling mistake in document databases, so it is worth seeing explicitly.</p>
+
+  <pre><code>// ANTI-PATTERN — do not do this
+{
+  _id: "CID482910",
+  name: "Priya Sharma",
+  bookings: [
+    { booking_id: "CNR3000142", date: "2024-03-14", value: 412.50 },
+    { booking_id: "CNR3000288", date: "2024-03-15", value: 180.00 },
+    // ... and one more every single day, forever
+  ]
+}</code></pre>
+
+  <div class="callout amber">
+    <p><strong>Four distinct failures, in the order you meet them:</strong></p>
+    <p><strong>1. The document grows without bound.</strong> A daily commuter adds ~500 entries a year. The array has no natural ceiling, so the only question is <em>when</em> the document breaks, not whether.</p>
+    <p><strong>2. Every read pays for every booking.</strong> Displaying the customer's name pulls their entire ride history off disk and across the network.</p>
+    <p><strong>3. Every write rewrites the document.</strong> As the document outgrows its allocated space the storage engine must relocate it — turning a cheap append into an expensive move.</p>
+    <p><strong>4. Indexing degrades.</strong> A multikey index on a 5,000-element array creates 5,000 index entries per document.</p>
+    <p><strong>The fix:</strong> keep <code>rides</code> as its own collection with <code>customer_id</code> on each booking — which is exactly how our dataset is shaped. Embed the one-to-few; reference the one-to-many.</p>
+  </div>
+
+  <h3>When an Array <em>Is</em> the Right Answer</h3>
+  <p>Arrays are not the problem; <em>unbounded</em> arrays are. These are fine because each has a natural ceiling:</p>
+  <pre><code>{ tags: ["airport", "night", "surge"] }                   // a handful
+{ saved_addresses: [ {label:"Home",...}, {label:"Work",...} ] }  // ~5 max
+{ fare_breakdown: [ {component:"base", amount:60},
+                    {component:"distance", amount:294},
+                    {component:"surge", amount:58.50} ] }  // fixed set</code></pre>
+
+  <p>If you cannot state the maximum number of elements with a straight face, reference instead.</p>
+
+  <h2 id="connect">Section 6: Connecting — mongosh, Compass, Drivers</h2>
+
+  <p>There are three ways into a MongoDB cluster and you will use all three this term.</p>
+
+  <div class="panel-grid">
+    <div class="panel-card">
+      <h3>⌨️ mongosh</h3>
+      <p>The official shell. A full JavaScript REPL with the database API attached. Everything in Lectures 13–16 is written for it.</p>
+      <p style="margin-top:.5rem"><strong>Best for:</strong> precise work, scripting, anything you need to reproduce or hand in.</p>
+    </div>
+    <div class="panel-card">
+      <h3>🖥️ Compass</h3>
+      <p>The official GUI. Browse collections, build queries visually, read the automatically inferred schema, and run explain plans with charts.</p>
+      <p style="margin-top:.5rem"><strong>Best for:</strong> exploring unfamiliar data and showing results to people who do not write queries.</p>
+    </div>
+    <div class="panel-card">
+      <h3>🔌 Drivers</h3>
+      <p>Official libraries for Node.js, Python, Java, C#, Go and more. The same operations, expressed in your application's language.</p>
+      <p style="margin-top:.5rem"><strong>Best for:</strong> production code — and for the Node dashboard you build in Lecture 20.</p>
+    </div>
+  </div>
+
+  <h3>The Connection String</h3>
+  <p>All three take the same SRV connection string you saved in Lecture 11:</p>
+
+  <pre><code>mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>mongodb+srv://</code></td><td>Use DNS SRV records to discover every node in the replica set — one hostname instead of three</td></tr>
+      <tr><td><code>bdma_student:&lt;password&gt;</code></td><td>The database user you created. URL-encode special characters: <code>@</code> becomes <code>%40</code></td></tr>
+      <tr><td><code>cluster0.xxxxx.mongodb.net</code></td><td>Your cluster's hostname — unique to your Atlas project</td></tr>
+      <tr><td>Trailing <code>/bdma</code></td><td>Optional default database. Supply it for <code>mongoimport</code>; omit it and use <code>use bdma</code> in the shell</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code># Connect the shell to your cluster
+mongosh "mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/"
+
+# Safer: let the shell prompt for the password instead of typing it
+mongosh "mongodb+srv://cluster0.xxxxx.mongodb.net/" \
+  --username bdma_student</code></pre>
+
+  <div class="callout amber">
+    <p><strong>Reminder from Lecture 11:</strong> that string contains a live credential. It belongs in a local <code>.env</code> file that is listed in <code>.gitignore</code> — never in a commit, a slide, a screenshot, or a Slack message. Automated scanners find exposed Atlas credentials within minutes of a public push.</p>
+  </div>
+
+  <h2 id="lab">Section 7: Hands-On — Load the Course Dataset</h2>
+
+  <p>From here to the end of the course, every query you write runs against the same data: <strong>15,000 Uber-style ride bookings from Delhi NCR covering calendar year 2024</strong>, in database <code>bdma</code>, collection <code>rides</code>. Load it now.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p>Install the tools. Download <strong>MongoDB Compass</strong> and the <strong>MongoDB Database Tools</strong> (which contain <code>mongoimport</code>) from mongodb.com/try/download. <code>mongosh</code> ships with Compass, or installs separately.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p>Open Compass, paste your connection string, and connect. You should see the built-in <code>admin</code> and <code>local</code> databases — proof the cluster is reachable and your user works.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p>Now connect from the shell and select a database. <code>use</code> does not create anything yet; the database springs into existence on the first write.</p>
+    <pre><code>mongosh "mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/"
+
+use bdma
+db                      // -> bdma
+show collections        // -> (empty)</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p>Insert your first document by hand. Watch the response: MongoDB returns the <code>_id</code> it generated.</p>
+    <pre><code>db.rides.insertOne({
+  booking_id: "CNR9999001",
+  booked_at: new Date("2024-03-14T18:22:07Z"),
+  date: "2024-03-14",
+  status: "Completed",
+  customer_id: "CID482910",
+  vehicle_type: "Go Sedan",
+  route: { pickup: "Connaught Place", drop: "Aerocity" },
+  avg_vtat: 7.4,
+  avg_ctat: 31.2,
+  booking_value: 412.50,
+  ride_distance: 18.4,
+  ratings: { driver: 4.6, customer: 4.8 },
+  payment_method: "UPI"
+})
+
+// { acknowledged: true,
+//   insertedId: ObjectId("65f1a2c4e8b9d4a1c2f30142") }</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p>Read it back, then confirm the collection now exists.</p>
+    <pre><code>db.rides.find()
+db.rides.find().pretty()           // formatted output
+show collections                   // -> rides
+db.rides.countDocuments()          // -> 1</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body"><p>Insert a second document with a <em>different shape</em> — a cancellation. It succeeds without complaint. That is flexible schema, demonstrated rather than described.</p>
+    <pre><code>db.rides.insertOne({
+  booking_id: "CNR9999002",
+  booked_at: new Date("2024-03-14T19:05:44Z"),
+  date: "2024-03-14",
+  status: "Cancelled by Driver",
+  customer_id: "CID695170",
+  vehicle_type: "Premier Sedan",
+  route: { pickup: "Indira Gandhi International Airport",
+           drop: "Gurgaon Cyber City" },
+  avg_vtat: 2.84,
+  cancellation: { by: "driver", reason: "Personal &amp; Car related issues" }
+})</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body"><p>Clear your two test documents, then import the real dataset. Run <code>mongoimport</code> from the repository root, in a normal terminal — <em>not</em> inside <code>mongosh</code>.</p>
+    <pre><code>// in mongosh
+db.rides.deleteMany({})</code></pre>
+    <pre><code># in your terminal, from the repo root
+mongoimport --uri "mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/bdma" \
+  --collection rides --file data/uber_bookings.json --jsonArray</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body"><p>Verify the import. These four numbers must match exactly before you leave the session.</p>
+    <pre><code>db.rides.countDocuments()                              // 15000
+db.rides.countDocuments({ status: "Completed" })       // 9343
+db.rides.countDocuments({ booking_value: { $exists: false } })  // 4756
+db.rides.findOne({ booking_id: "CNR3000142" })</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">9</div>
+    <div class="step-body"><p><strong>Optional but recommended.</strong> <code>mongoimport</code> loads <code>booked_at</code> as a string because that is what JSON can express. Convert it to a real BSON <code>Date</code> so that Lectures 13–16 can do time arithmetic on it.</p>
+    <pre><code>db.rides.updateMany(
+  { booked_at: { $type: "string" } },
+  [ { $set: { booked_at: { $toDate: "$booked_at" } } } ]
+)
+
+db.rides.findOne({}, { booked_at: 1, _id: 0 })   // now an ISODate</code></pre></div>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Sanity check on what you just loaded.</strong> 15,000 bookings; 9,343 completed (62.29%); average completed fare ₹235.73 against a total of ₹22,02,449; average distance 10.87 km; average driver rating 4.41; average VTAT 8.03 minutes. The busiest hour is 18:00 with 1,373 bookings, and the worst hour for failures is 17:00 at a 39.92% failure rate. Top pickup points: Noida Sector 62 (1,209), Indira Gandhi International Airport (1,183), New Delhi Railway Station (1,179), Gurgaon Cyber City (1,178), Connaught Place (1,139). You will reproduce every one of these figures yourself in Lectures 13 and 14.</p>
+  </div>
+
+  <h3>Explore in Compass Before You Leave</h3>
+  <p>In Compass, open <code>bdma.rides</code> and click the <strong>Schema</strong> tab. Compass samples the collection and reports, for every field, its types and how often it appears. You will see <code>booking_value</code> present in only about 68% of documents. That is not an error — it is the dataset telling you the truth about failed bookings, and it is the hook for Lecture 13.</p>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>A document is the unit of storage, and it nests.</strong> Deployment → database → collection → document → field maps onto server → database → table → row → column, except that collections have no fixed columns and fields may hold whole structures.</li>
+      <li><strong>You write JSON; MongoDB stores BSON.</strong> Binary gives real types (<code>ObjectId</code>, <code>Date</code>, <code>Decimal128</code>, <code>Int32</code>/<code>Int64</code>), guaranteed field order, and length-prefixed traversal. Money belongs in <code>Decimal128</code>.</li>
+      <li><strong>Every document has an <code>_id</code>, and the default <code>ObjectId</code> is 12 bytes</strong> — 4-byte timestamp, 5-byte random, 3-byte counter. It is therefore roughly time-sortable and safe to generate client-side with no coordination.</li>
+      <li><strong>Flexible schema is not the absence of a schema</strong> — it is the deferral of the decision. <code>$jsonSchema</code> with <code>validator</code> is how a mature team re-tightens it, progressively, where the business actually needs guarantees.</li>
+      <li><strong>Embed what is read together, bounded, and changes together; reference what is large, unbounded, shared, or changes independently.</strong> When the tests disagree, access pattern wins.</li>
+      <li><strong>16 MB is a hard document ceiling and an early-warning system.</strong> The unbounded array — all of a customer's bookings inside the customer document — is the anti-pattern it exists to catch.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 13 — Querying Data with MongoDB</h3>
+    <p>With 15,000 rides loaded, we turn the collection into answers. The full CRUD surface, the operator families (<code>$gt</code>, <code>$in</code>, <code>$exists</code>, <code>$elemMatch</code> and the rest), dot notation for nested fields, projection, sorting and paging, and the update operators that change data in place. The lab is eight business questions you must answer in <code>mongosh</code>. Arrive with the dataset imported and verified at 15,000 documents.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture11/notes.html">← Lecture 11</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture13/notes.html">Lecture 13 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>
