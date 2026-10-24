@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../assets/css/base.css" />
   <link rel="stylesheet" href="../assets/css/dashboard.css" />
   <script src="../assets/js/theme.js"></script>
+  <script src="../assets/js/pipelines.js"></script>
 </head>
 <body>
 
@@ -21,6 +22,7 @@
       <a href="../assignments.html">Assignments</a>
       <a href="../commands.html">Commands</a>
       <a href="index.html" class="active">Dashboard</a>
+      <a href="../atlas-charts.html">Atlas Charts</a>
     </div>
     <span class="nav-tag">Lectures 15–16</span>
     <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
@@ -99,6 +101,14 @@
     </div>
   </div>
 
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>The pipeline behind these numbers</h3>
+      <p class="chart-sub">Every KPI above comes from this single pass over the collection. In Atlas Charts each one becomes its own Number chart sharing this query. <a href="../atlas-charts.html">Rebuild the whole dashboard in Atlas Charts →</a></p>
+      <div data-pipeline="kpis"></div>
+    </div>
+  </div>
+
   <div class="dash-section-title">Where bookings end up</div>
   <div class="chart-grid">
 
@@ -110,6 +120,7 @@
         <strong>Four in ten bookings fail.</strong> Driver cancellations alone are nearly three times
         the size of customer cancellations — which moves this from a demand problem to a supply problem.
       </div>
+          <div data-pipeline="status_breakdown"></div>
     </div>
 
     <div class="chart-card">
@@ -117,6 +128,7 @@
       <p class="chart-sub">Driver-side reasons, ranked. These are the cancellations the business can actually act on.</p>
       <div id="rankDriverReasons" class="rank-list"></div>
       <div class="chart-insight warn" id="insightDriver"></div>
+          <div data-pipeline="driver_reasons"></div>
     </div>
 
   </div>
@@ -137,6 +149,15 @@
       </div>
       <div class="chart-insight warn" id="insightHourly"></div>
       <div class="chart-insight" id="insightHourlyTrap"></div>
+          <div data-pipeline="by_hour"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>The guard that makes the hourly chart honest</h3>
+      <p class="chart-sub">Rank the same hours by failure rate with no volume floor and 03:00 tops the table at 43.48% — on 46 bookings for the entire year. One stage repairs it.</p>
+      <div data-pipeline="hourly_volume_floor"></div>
     </div>
   </div>
 
@@ -151,6 +172,7 @@
         and it tells you the leak is structural rather than seasonal — it is present every single month,
         so there is no quarter to blame it on.
       </div>
+          <div data-pipeline="by_month"></div>
     </div>
   </div>
 
@@ -166,6 +188,7 @@
         High-value products deserve disproportionate attention when a ride fails, because each
         failure costs roughly twice as much.
       </div>
+          <div data-pipeline="by_vehicle"></div>
     </div>
 
     <div class="chart-card">
@@ -177,6 +200,7 @@
         still settle in cash, which constrains any pricing or refund mechanism that assumes a
         card on file.
       </div>
+          <div data-pipeline="payment_methods"></div>
     </div>
 
   </div>
@@ -201,6 +225,7 @@
           <tbody id="tableVehicle"></tbody>
         </table>
       </div>
+      <div data-pipeline="by_vehicle"></div>
     </div>
   </div>
 
@@ -228,6 +253,7 @@
         office cluster, an airport and a railway station. They also carry the highest cancellation
         rates, which is where a targeted driver-incentive pilot would start.
       </div>
+      <div data-pipeline="top_pickups"></div>
     </div>
   </div>
 
@@ -242,6 +268,7 @@
         mind. &ldquo;Driver is not moving towards pickup location&rdquo; and &ldquo;AC is not working&rdquo;
         together describe a driver who has accepted a ride they did not want.
       </div>
+          <div data-pipeline="customer_reasons"></div>
     </div>
   </div>
 
@@ -274,5 +301,6 @@
 
 <script src="../data/uber_summary.js"></script>
 <script src="../assets/js/dashboard.js"></script>
+<script src="../assets/js/pipeline-ui.js"></script>
 </body>
 </html>
