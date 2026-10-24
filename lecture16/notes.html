@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 16 — Dashboard Storytelling &amp; the Recommendation | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 16 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 3</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 3 · Lecture 16</div>
+  <h1>Dashboard Storytelling &amp; the Recommendation</h1>
+  <p class="subtitle">Four charts and a finding are not an answer. Today we turn them into the one page the operations director takes to the board.</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO4</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 15 (your four-chart dashboard)</span>
+    <span>🔧 <strong>Lab:</strong> Atlas Charts + a one-page memo</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#gap">Section 1: The Gap Between a Chart and a Decision</a></li>
+      <li><a href="#deepdive">Section 2: The Cancellation Deep-Dive</a></li>
+      <li><a href="#seventeen">Section 3: Interrogating the 17:00 Finding</a></li>
+      <li><a href="#geography">Section 4: Adding Geography — Where It Happens</a></li>
+      <li><a href="#story">Section 5: Structuring the Story</a></li>
+      <li><a href="#memo">Section 6: The One-Page Recommendation</a></li>
+      <li><a href="#limits">Section 7: Saying What the Data Cannot Tell You</a></li>
+      <li><a href="#lab">Section 8: Hands-On — Finish the Dashboard, Write the Memo</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Explain why a correct dashboard can still fail to produce a decision</li>
+    <li><span class="check">✓</span> Drill from a headline metric into the segment that actually drives it</li>
+    <li><span class="check">✓</span> Stress-test a finding before presenting it, rather than after being challenged</li>
+    <li><span class="check">✓</span> Sequence charts so they form an argument rather than a collection</li>
+    <li><span class="check">✓</span> Write a recommendation containing an action, a quantified impact and a falsification test</li>
+    <li><span class="check">✓</span> State the limits of an analysis without undermining it</li>
+    <li><span class="check">✓</span> Defend a number under hostile questioning</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Time</th><th>Segment</th><th>What Happens</th></tr></thead>
+      <tbody>
+        <tr><td>0–8 min</td><td>The gap</td><td>Why last week's dashboard is not yet an answer</td></tr>
+        <tr><td>8–24 min</td><td>Cancellation deep-dive</td><td>Driver vs customer, and what a flat distribution means</td></tr>
+        <tr><td>24–40 min</td><td>Interrogating 17:00</td><td>Four attacks on our own finding, and whether it survives</td></tr>
+        <tr><td>40–52 min</td><td>Geography</td><td>Pickup-point analysis; the hub concentration</td></tr>
+        <tr><td>52–64 min</td><td>Story structure</td><td>Sequencing charts into an argument; the Z-pattern</td></tr>
+        <tr><td>64–76 min</td><td>The memo</td><td>Action, impact, falsification — written live</td></tr>
+        <tr><td>76–84 min</td><td>Limits</td><td>What this data cannot answer, and saying so well</td></tr>
+        <tr><td>84–90 min</td><td>Wrap</td><td>Project brief preview; Assignment 3 clarifications</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="gap">Section 1: The Gap Between a Chart and a Decision</h2>
+
+  <p>You finished Lecture 15 with four correct charts and one genuine finding: the 17:00 failure rate. If you emailed that dashboard to the operations director right now, the reply would be one word — <em>&ldquo;And?&rdquo;</em></p>
+
+  <p>That reply is the whole subject of this lecture. There are three distinct levels of analytical output, and most analysts stop one level too early:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Level</th><th>What it sounds like</th><th>What the reader does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Description</strong></td><td>&ldquo;37.71% of bookings fail.&rdquo;</td><td>Nods. Nothing changes.</td></tr>
+        <tr><td><strong>Diagnosis</strong></td><td>&ldquo;Most failures are supply-side, and they concentrate at 17:00.&rdquo;</td><td>Finds it interesting. Still nothing changes.</td></tr>
+        <tr><td><strong>Recommendation</strong></td><td>&ldquo;Run a driver incentive at 16:30–17:30 in the top three hubs. Cost ₹X, recovers ₹Y, and we will know inside three weeks.&rdquo;</td><td>Decides.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The dashboard is the evidence, not the argument.</strong> Nobody ever acted on a chart. They act on a sentence containing a verb, and they trust it because a chart stands behind it. If your final slide has no verb, you have built evidence for a case nobody made.</p>
+  </div>
+
+  <p>So today's work is in two halves. First we go deeper into the data, because a recommendation needs more than one finding to stand on. Then we structure what we have into something a busy person can act on in ninety seconds.</p>
+
+  <h2 id="deepdive">Section 2: The Cancellation Deep-Dive</h2>
+
+  <p>We know 37.71% of bookings fail. &ldquo;Reduce cancellations&rdquo; is not actionable. Decompose it until it names someone who can do something.</p>
+
+  <h3>Step 1 — Split by who caused it</h3>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Outcome</th><th>Bookings</th><th>Share of all</th><th>Who can fix it</th></tr></thead>
+      <tbody>
+        <tr><td>Cancelled by Driver</td><td>2,698</td><td>17.99%</td><td>Supply team — incentives, allocation, penalties</td></tr>
+        <tr><td>No Driver Found</td><td>1,036</td><td>6.91%</td><td>Supply team — fleet density</td></tr>
+        <tr><td>Cancelled by Customer</td><td>1,022</td><td>6.81%</td><td>Product — ETA accuracy, pricing clarity</td></tr>
+        <tr><td>Incomplete</td><td>901</td><td>6.01%</td><td>Operations — mid-trip failures</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Group the first two: <strong>3,734 bookings, 24.89% of everything, fail because no driver completed the job.</strong> That is nearly four times the customer-cancellation rate. The problem now has an owner, and it is not the product team.</p>
+
+  <div class="callout green">
+    <p><strong>This is the single most valuable move in the analysis.</strong> &ldquo;37.71% of bookings fail&rdquo; is a statistic that belongs to nobody. &ldquo;Roughly a quarter of all bookings fail on the supply side&rdquo; names a department and a budget. Decomposition is how a number acquires an owner.</p>
+  </div>
+
+  <h3>Step 2 — Ask why, and get an unhelpful answer</h3>
+
+  <p>Chart 4 from last week gave us the driver reason codes:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Driver reason</th><th>Count</th><th>Share of driver cancellations</th></tr></thead>
+      <tbody>
+        <tr><td>Customer related issue</td><td>729</td><td>27.02%</td></tr>
+        <tr><td>More than permitted people in there</td><td>666</td><td>24.68%</td></tr>
+        <tr><td>Personal &amp; Car related issues</td><td>652</td><td>24.17%</td></tr>
+        <tr><td>The customer was coughing/sick</td><td>651</td><td>24.13%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Four reasons spanning less than three percentage points. There is no dominant cause, and a flat distribution like this has exactly two honest interpretations:</p>
+
+  <ol>
+    <li><strong>The causes genuinely are evenly spread</strong> — in which case any single intervention addresses at most a quarter of the problem, and you should say so before someone budgets for a silver bullet.</li>
+    <li><strong>The reason codes are not measuring what they claim to.</strong> Three of the four blame the customer. Drivers select from a dropdown under time pressure, and the options that avoid penalty are the ones that get selected. This is a <strong>measurement artefact</strong>, not a finding about customers.</li>
+  </ol>
+
+  <div class="callout blue">
+    <p><strong>Interpretation two is almost certainly closer to the truth, and you can say so without overclaiming.</strong> &ldquo;Three of the four leading driver-cancellation reasons attribute fault to the customer, in near-equal proportions. That pattern is more consistent with drivers selecting the lowest-penalty option than with a real distribution of causes. We should not design an intervention around these codes until they are validated.&rdquo; That is a defensible paragraph, and it is far more useful than a bar chart of unreliable categories.</p>
+  </div>
+
+  <h3>Step 3 — Cross-check against the customer side</h3>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Customer reason</th><th>Count</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Driver is not moving towards pickup location</td><td>211</td><td>20.65%</td></tr>
+        <tr><td>AC is not working</td><td>210</td><td>20.55%</td></tr>
+        <tr><td>Driver asked to cancel</td><td>208</td><td>20.35%</td></tr>
+        <tr><td>Change of plans</td><td>203</td><td>19.86%</td></tr>
+        <tr><td>Wrong Address</td><td>190</td><td>18.59%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>This table contains the most important single row in the whole dataset. <strong>&ldquo;Driver asked to cancel&rdquo; — 208 bookings, 20.35% of customer cancellations.</strong></p>
+
+  <p>Those are driver cancellations recorded as customer cancellations. The driver did not want the trip, asked the passenger to cancel so the penalty fell on them, and the data now attributes it to the customer. Add the 211 &ldquo;driver is not moving towards pickup&rdquo; — a strong signal of the same behaviour — and roughly <strong>419 of 1,022 customer cancellations, 41%, are plausibly driver-initiated.</strong></p>
+
+  <div class="callout amber">
+    <p><strong>The supply-side share is therefore understated, not overstated.</strong> Our 24.89% figure was already the largest component. Reattributing those 419 bookings pushes it toward 27.6%, and it means the customer-cancellation number — the one that looks like a product problem — is substantially a supply problem wearing a disguise. <strong>Always look for the category that is absorbing another category's failures.</strong></p>
+  </div>
+
+  <h2 id="seventeen">Section 3: Interrogating the 17:00 Finding</h2>
+
+  <p>The 17:00 result is the centrepiece of the recommendation, which means it has to survive being attacked. Do that yourself, in private, before someone does it to you in a board meeting.</p>
+
+  <h3>Attack 1 — &ldquo;Is this just a small sample?&rdquo;</h3>
+
+  <p>Fair question, and it is exactly the trap that catches 03:00 with its 43.48% on 46 bookings. But 17:00 carries <strong>1,062 bookings</strong>. At that volume the rate is stable to within a fraction of a percentage point. <strong>Survives.</strong></p>
+
+  <h3>Attack 2 — &ldquo;Isn't 39.92% basically the same as 37.14%?&rdquo;</h3>
+
+  <p>The honest answer is that it is a 2.78 percentage-point gap — a 7.5% relative increase in failure rate. Across 1,062 bookings that is roughly 30 additional failed trips in that hour alone, or about ₹7,000 of fares. Over a year it is material; in any single hour it is modest.</p>
+
+  <p><strong>Partially survives.</strong> The right framing is not &ldquo;17:00 is catastrophic&rdquo; but &ldquo;17:00 is where the failure rate peaks, and it is the leading edge of the evening block where volume is highest.&rdquo; The intervention should target 16:00–18:00 as a window, not 17:00 as a point — 16:00 fails at 40.45%, which strengthens rather than weakens the pattern.</p>
+
+  <div class="callout green">
+    <p><strong>Noticing that 16:00 fails at 40.45% is what turns a point into a trend.</strong> One anomalous hour is a curiosity. Two consecutive hours of elevated failure immediately before the demand peak is a mechanism: drivers have not yet repositioned for the evening rush. The second data point is what makes the story credible.</p>
+  </div>
+
+  <h3>Attack 3 — &ldquo;Could it be composition rather than time?&rdquo;</h3>
+
+  <p>A real concern. If 17:00 happens to carry a disproportionate share of airport trips, and airport trips fail more often, then the hour is innocent and we would be fixing the wrong variable. Test it by segmenting the 17:00 bookings by vehicle type and pickup location and comparing against the daily mix. If the composition matches but the rate differs, time is the driver. <strong>This is the check that separates a finding from a coincidence</strong>, and it is the kind of work the project rubric rewards.</p>
+
+  <h3>Attack 4 — &ldquo;What would make this wrong?&rdquo;</h3>
+
+  <p>Always have an answer. Ours: if driver log-in data showed the <em>same</em> number of active drivers at 16:00–17:00 as at 18:00, our repositioning explanation collapses and we would need a different mechanism. <strong>We do not have driver supply data</strong> — and saying that plainly is a strength, not a weakness. It tells the reader exactly which additional dataset would resolve the question.</p>
+
+  <h2 id="geography">Section 4: Adding Geography — Where It Happens</h2>
+
+  <p>Time tells you when to intervene. Location tells you where. Together they make an intervention small enough to be affordable.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Pickup location</th><th>Bookings</th><th>Cancelled</th><th>Cancellation rate</th><th>Revenue</th></tr></thead>
+      <tbody>
+        <tr><td>Noida Sector 62</td><td>1,209</td><td>405</td><td>33.50%</td><td>₹1,82,078</td></tr>
+        <tr><td>Indira Gandhi International Airport</td><td>1,183</td><td>388</td><td>32.80%</td><td>₹2,04,445</td></tr>
+        <tr><td>New Delhi Railway Station</td><td>1,179</td><td>391</td><td>33.16%</td><td>—</td></tr>
+        <tr><td>Gurgaon Cyber City</td><td>1,178</td><td>368</td><td>31.24%</td><td>—</td></tr>
+        <tr><td>Connaught Place</td><td>1,139</td><td>374</td><td>32.84%</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Two things stand out, and the second is easy to miss.</p>
+
+  <p><strong>First: the top five are all transport or office hubs</strong> — an office cluster, an airport, a railway station, a business district and a city centre. They account for 5,888 bookings, <strong>39% of all demand</strong>, concentrated in five places. Anything you do at those five locations reaches four bookings in ten.</p>
+
+  <p><strong>Second: the cancellation rates are remarkably similar</strong> — 31.24% to 33.50%, a spread of barely two points. There is no catastrophic location. This is genuinely useful because it rules something out: the problem is <strong>systemic, not local</strong>. A fix aimed at one bad hub would not work, because there is no bad hub.</p>
+
+  <div class="callout blue">
+    <p><strong>A flat distribution is a finding when it rules out a hypothesis.</strong> &ldquo;We checked whether specific locations drive the failures. They do not — the spread across the top five is two percentage points. This is a system-wide supply problem, so the intervention has to be system-wide or time-based rather than site-specific.&rdquo; That paragraph does real work, and it comes from a chart that looks boring.</p>
+  </div>
+
+  <p>Combine the two dimensions and the intervention sharpens considerably: not &ldquo;fix cancellations&rdquo;, but <strong>&ldquo;target the 16:00–18:00 window at the five hubs that carry 39% of demand&rdquo;</strong> — a defined, costable, measurable action.</p>
+
+  <h2 id="story">Section 5: Structuring the Story</h2>
+
+  <p>You now have five findings. Presented in the order you discovered them, they are a lab notebook. Presented in the right order, they are an argument.</p>
+
+  <h3>The shape that works</h3>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>The stake.</strong> 37.71% of bookings fail; up to ₹13.3 lakh of annual revenue at risk. Establish that the problem is worth the room's attention.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>The narrowing.</strong> Roughly a quarter of all bookings fail on the supply side — and reattributing &ldquo;driver asked to cancel&rdquo; pushes that higher. This is not a demand problem. The problem now has an owner.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>The mechanism.</strong> Failures peak at 16:00–17:00, immediately <em>before</em> the 18:00 demand peak, which is consistent with drivers not yet having repositioned. This is the insight the audience did not have.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p><strong>The target.</strong> Five hubs carry 39% of demand with uniform cancellation rates — so the intervention is time-based and system-wide, concentrated where volume already is.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <p><strong>The action.</strong> One recommendation, costed, with an expected impact and a date by which you will know whether it worked.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <p><strong>The limits.</strong> What this analysis cannot establish, and what data would close the gap. Placed last so it qualifies the recommendation without burying it.</p>
+    </div>
+  </div>
+
+  <h3>Laying it out on the dashboard</h3>
+
+  <p>Readers scan a dashboard in a Z: top-left, top-right, bottom-left, bottom-right. Put the stake top-left, the mechanism top-right, and the supporting detail below. A chart placed bottom-right is the last thing read and the first thing ignored — never put your key finding there.</p>
+
+  <div class="callout">
+    <p><strong>Three formatting rules that do most of the work.</strong> Every title states its question and its population. Every axis carries its unit. Every number on the page can be traced to a pipeline you can run on request. Charts that meet those three rules survive scrutiny; charts that do not get argued about instead of acted on.</p>
+  </div>
+
+  <h2 id="memo">Section 6: The One-Page Recommendation</h2>
+
+  <p>This is the deliverable. The dashboard is the appendix.</p>
+
+  <div class="callout green">
+    <p><strong>Ride Completion — Recommendation</strong></p>
+    <p><strong>Finding.</strong> 5,657 of 15,000 bookings in 2024 (37.71%) did not carry a passenger, against realised revenue of ₹22.0 lakh. At the average completed fare of ₹235.73 this represents up to ₹13.3 lakh of forgone revenue — an upper bound, since some customers rebooked successfully.</p>
+    <p><strong>Diagnosis.</strong> At least 24.89% of all bookings (3,734) fail on the supply side: driver cancellations plus no-driver-found. A further 419 customer cancellations cite &ldquo;driver asked to cancel&rdquo; or &ldquo;driver not moving towards pickup&rdquo;, which are plausibly driver-initiated, taking the supply-side share toward 27.6%. Customer-initiated cancellation is a minority of the problem.</p>
+    <p><strong>Mechanism.</strong> Failure rates peak at 16:00 (40.45%) and 17:00 (39.92%), <em>above</em> the 18:00 demand peak's 37.14% despite 18:00 carrying more bookings. Supply appears to lag demand by one to two hours as drivers reposition for the evening.</p>
+    <p><strong>Recommendation.</strong> Pilot a time-boxed driver incentive from 16:00 to 18:00 at the five highest-volume pickup hubs, which together carry 39% of demand. Size the incentive below the ₹235.73 average fare so the economics hold at any recovery rate above break-even.</p>
+    <p><strong>Expected impact.</strong> Closing the 16:00–17:00 gap to the 18:00 baseline would recover roughly 60 trips per day across the two hours, approximately ₹14,000 daily or ₹51 lakh annualised at current volumes — before incentive cost.</p>
+    <p><strong>How we will know.</strong> Compare the 16:00–18:00 failure rate at pilot hubs against non-pilot hubs over three weeks. If the gap does not close by at least one percentage point, the repositioning explanation is wrong and we stop.</p>
+    <p><strong>What this cannot tell us.</strong> We have no driver log-in or location data, so the repositioning mechanism is inferred, not observed. Driver-reported cancellation reasons are unreliable — three of the four leading codes attribute fault to the customer in near-equal proportions, which is more consistent with penalty-avoidance than with a real distribution of causes.</p>
+  </div>
+
+  <h3>What makes that page work</h3>
+
+  <ul>
+    <li><strong>Every number has a denominator.</strong> Not &ldquo;cancellations are high&rdquo; but &ldquo;3,734 of 15,000&rdquo;.</li>
+    <li><strong>The recommendation contains a verb and a boundary.</strong> Pilot, at these five hubs, in this window, at below this price.</li>
+    <li><strong>The impact estimate is arithmetic the reader can check.</strong> Show the multiplication; do not assert the product.</li>
+    <li><strong>There is a stopping rule.</strong> Naming the condition under which you abandon your own recommendation is the strongest credibility signal available to you.</li>
+    <li><strong>The limitations are specific.</strong> &ldquo;We lack driver log-in data&rdquo; is useful. &ldquo;Further research is needed&rdquo; is filler.</li>
+  </ul>
+
+  <h2 id="limits">Section 7: Saying What the Data Cannot Tell You</h2>
+
+  <p>Analysts under-report limitations because they fear it weakens the case. In practice the opposite happens: the reader who finds an unacknowledged limitation stops trusting everything else on the page.</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Limitation</th><th>Weak phrasing</th><th>Strong phrasing</th></tr></thead>
+      <tbody>
+        <tr><td>No driver supply data</td><td>&ldquo;More data would help.&rdquo;</td><td>&ldquo;We infer repositioning from the demand side. Driver log-in timestamps would confirm or kill it in a day.&rdquo;</td></tr>
+        <tr><td>Unreliable reason codes</td><td>&ldquo;The reasons are unclear.&rdquo;</td><td>&ldquo;Three of four leading driver reasons blame the customer in near-equal shares — a pattern more consistent with penalty-avoidance than with real causes.&rdquo;</td></tr>
+        <tr><td>Lost-revenue estimate</td><td>&ldquo;This is approximate.&rdquo;</td><td>&ldquo;₹13.3 lakh is an upper bound assuming no rebooking. The true figure is lower; the conclusion holds even if it is half.&rdquo;</td></tr>
+        <tr><td>One year of data</td><td>&ldquo;Limited time range.&rdquo;</td><td>&ldquo;2024 only, so we cannot separate a structural pattern from a one-year anomaly. The pattern is present in all twelve months, which argues for structural.&rdquo;</td></tr>
+        <tr><td>Correlation only</td><td>&ldquo;Causation unproven.&rdquo;</td><td>&ldquo;The pilot is the experiment. That is why we propose testing it on a subset rather than rolling it out.&rdquo;</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>The pattern in the strong column:</strong> name the specific gap, state what would close it, and say whether the conclusion survives. A limitation handled that way <em>adds</em> authority, because it demonstrates you went looking for the weaknesses yourself.</p>
+  </div>
+
+  <h2 id="lab">Section 8: Hands-On — Finish the Dashboard, Write the Memo</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <p><strong>Add the pickup-location chart.</strong> Horizontal bar, <code>route.pickup</code> on Y, <code>COUNT</code> on X, sorted descending, limited to 10. Add a second value showing cancellation rate so volume and risk sit side by side.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <p><strong>Add the customer-reason chart</strong> and find &ldquo;Driver asked to cancel&rdquo; yourself. Confirm the 208 figure in <code>mongosh</code> before you build anything on it:</p>
+      <pre><code>db.rides.countDocuments({
+  "cancellation.by": "customer",
+  "cancellation.reason": "Driver asked to cancel"
+})</code></pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <p><strong>Run the composition check from Attack 3.</strong> Group 17:00 bookings by <code>vehicle_type</code> and compare the mix against the full day. If the mixes match, time is the driver and your finding holds.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <p><strong>Re-sequence the dashboard</strong> into the six-step order from Section 5. Move charts physically. The stake goes top-left; the 16:00–18:00 mechanism goes top-right.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <p><strong>Retitle every chart</strong> as a question with its population stated. &ldquo;Status&rdquo; becomes &ldquo;How do bookings end? (All 15,000 bookings, 2024)&rdquo;.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <p><strong>Write your own one-page memo.</strong> Use the Section 6 structure but reach your own recommendation — you may well disagree with the incentive pilot, and a well-argued alternative scores higher than a copy. This is <a href="../assignments.html">Assignment 3</a>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body">
+      <p><strong>Have a classmate attack it.</strong> Give them five minutes and ask for the weakest number on the page. Whatever they find is what the marker will find.</p>
+    </div>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>Description, diagnosis, recommendation are three different outputs.</strong> Most analysis stops at diagnosis. Only the third one causes anything to happen.</li>
+      <li><strong>Decomposition gives a number an owner.</strong> &ldquo;37.71% fail&rdquo; belongs to nobody; &ldquo;24.89% fail on the supply side&rdquo; names a department and a budget.</li>
+      <li><strong>Look for the category absorbing another's failures.</strong> 208 customer cancellations say &ldquo;driver asked to cancel&rdquo; — supply-side failures hiding in the demand-side column.</li>
+      <li><strong>Attack your own finding before presenting it.</strong> Sample size, effect size, composition, and &ldquo;what would make this wrong?&rdquo; — in that order.</li>
+      <li><strong>A flat distribution is a finding when it rules something out.</strong> Uniform cancellation rates across the top five hubs prove the problem is systemic, not local.</li>
+      <li><strong>Name the condition under which you would abandon your own recommendation.</strong> It is the strongest credibility signal on the page, and almost nobody does it.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 17 — Redis &amp; the Key-Value Model</h3>
+    <p>This dashboard recomputes its aggregations every time someone opens it — fine for a weekly review, hopeless for a wall-mounted operations screen refreshing every second. Next module we meet the opposite architecture: compute at write time, read in constant time. Same business questions, a completely different engineering trade.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture15/notes.html">← Lecture 15</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture17/notes.html">Lecture 17 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

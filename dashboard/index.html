@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uber Ride Analytics Dashboard | BDMA</title>
+  <meta name="description" content="The reference dashboard built across Lectures 15 and 16 — 15,000 ride bookings, where they fail, and what it costs." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/dashboard.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="../index.html" class="nav-brand"><span class="dot"></span><span>BDMA</span></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="../index.html">Lectures</a>
+      <a href="../assignments.html">Assignments</a>
+      <a href="../commands.html">Commands</a>
+      <a href="index.html" class="active">Dashboard</a>
+    </div>
+    <span class="nav-tag">Lectures 15–16</span>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<header class="dash-head">
+  <div class="dash-head-inner">
+    <h1>Uber Ride Analytics — <span>Where the Money Leaks</span></h1>
+    <p>
+      Fifteen thousand ride bookings across Delhi NCR in 2024. The operation looks healthy until you
+      count the bookings that never carried a passenger. This is the dashboard we build in Lecture 15
+      and interrogate in Lecture 16 — the same aggregations you will write by hand in Lecture 14, and
+      the same numbers you will recompute in Redis in Lecture 18.
+    </p>
+    <div class="dash-chips">
+      <span class="dash-chip">bdma.rides</span>
+      <span class="dash-chip">Delhi NCR · 2024</span>
+      <span class="dash-chip">15,000 bookings</span>
+      <span class="dash-chip grey" id="dashGenerated">—</span>
+    </div>
+  </div>
+</header>
+
+<main class="dash" id="dashBody">
+
+  <div class="dash-section-title">The headline numbers</div>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <span class="kpi-label">Total bookings</span>
+      <span class="kpi-value" id="kpiTotal">—</span>
+      <span class="kpi-note">Every booking request placed in 2024</span>
+    </div>
+    <div class="kpi good">
+      <span class="kpi-label">Completion rate</span>
+      <span class="kpi-value" id="kpiCompletion">—</span>
+      <span class="kpi-note" id="kpiCompletionNote">—</span>
+    </div>
+    <div class="kpi warn">
+      <span class="kpi-label">Failure rate</span>
+      <span class="kpi-value" id="kpiFailure">—</span>
+      <span class="kpi-note" id="kpiFailureNote">—</span>
+    </div>
+    <div class="kpi warn">
+      <span class="kpi-label">Estimated lost revenue</span>
+      <span class="kpi-value" id="kpiLost">—</span>
+      <span class="kpi-note" id="kpiLostNote">—</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Revenue realised</span>
+      <span class="kpi-value" id="kpiRevenue">—</span>
+      <span class="kpi-note" id="kpiRevenueNote">—</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid" style="margin-top:1rem">
+    <div class="kpi info">
+      <span class="kpi-label">Avg booking value</span>
+      <span class="kpi-value" id="kpiAvgValue">—</span>
+      <span class="kpi-note">Completed rides only</span>
+    </div>
+    <div class="kpi info">
+      <span class="kpi-label">Avg ride distance</span>
+      <span class="kpi-value" id="kpiAvgDistance">—</span>
+      <span class="kpi-note">Across all completed trips</span>
+    </div>
+    <div class="kpi info">
+      <span class="kpi-label">Avg time to arrive</span>
+      <span class="kpi-value" id="kpiVtat">—</span>
+      <span class="kpi-note">VTAT — vehicle time to arrive at pickup</span>
+    </div>
+    <div class="kpi info">
+      <span class="kpi-label">Avg driver rating</span>
+      <span class="kpi-value" id="kpiRating">—</span>
+      <span class="kpi-note" id="kpiRatingNote">—</span>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Where bookings end up</div>
+  <div class="chart-grid">
+
+    <div class="chart-card">
+      <h3>Booking status mix</h3>
+      <p class="chart-sub">Every booking resolves to exactly one of five outcomes. Only the green slice earns revenue.</p>
+      <div class="chart-body" id="chartStatus"></div>
+      <div class="chart-insight warn">
+        <strong>Four in ten bookings fail.</strong> Driver cancellations alone are nearly three times
+        the size of customer cancellations — which moves this from a demand problem to a supply problem.
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Why bookings are cancelled</h3>
+      <p class="chart-sub">Driver-side reasons, ranked. These are the cancellations the business can actually act on.</p>
+      <div id="rankDriverReasons" class="rank-list"></div>
+      <div class="chart-insight warn" id="insightDriver"></div>
+    </div>
+
+  </div>
+
+  <div class="dash-section-title">Demand across the day</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Hourly booking volume and failure rate</h3>
+      <p class="chart-sub">
+        Bars show booking volume against the left axis; the amber line shows the share of those bookings
+        that failed, against the right axis. The teal bar is the busiest hour, the red bar is the worst hour.
+      </p>
+      <div class="chart-body" id="chartHourly"></div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:#14b8a6"></span>Busiest hour</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#ef4444"></span>Worst failure rate among high-volume hours</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#f59e0b"></span>Failure rate (%)</span>
+      </div>
+      <div class="chart-insight warn" id="insightHourly"></div>
+      <div class="chart-insight" id="insightHourlyTrap"></div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">The year in shape</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Monthly bookings and revenue</h3>
+      <p class="chart-sub">Volume against the left axis, realised revenue against the right. Watch for months where the two lines disagree — that is a completion-rate problem, not a demand problem.</p>
+      <div class="chart-body" id="chartMonthly"></div>
+      <div class="chart-insight">
+        <strong>Revenue tracks volume closely across the year.</strong> That is the expected pattern,
+        and it tells you the leak is structural rather than seasonal — it is present every single month,
+        so there is no quarter to blame it on.
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Product and payment mix</div>
+  <div class="chart-grid">
+
+    <div class="chart-card">
+      <h3>Revenue by vehicle type</h3>
+      <p class="chart-sub">Revenue first, completion rate second. The two do not rank the same way.</p>
+      <div id="rankVehicle" class="rank-list"></div>
+      <div class="chart-insight">
+        <strong>Premier Sedan earns the most revenue on a third of Go Sedan's volume.</strong>
+        High-value products deserve disproportionate attention when a ride fails, because each
+        failure costs roughly twice as much.
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Payment method mix</h3>
+      <p class="chart-sub">How completed rides were paid for. Share of completed bookings.</p>
+      <div id="rankPayment" class="rank-list"></div>
+      <div class="chart-insight">
+        <strong>UPI is the default and cash is far from dead.</strong> A quarter of completed rides
+        still settle in cash, which constrains any pricing or refund mechanism that assumes a
+        card on file.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="dash-section-title">Vehicle performance detail</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>All vehicle types</h3>
+      <p class="chart-sub">Completion rates below the fleet average of 62.29% are flagged in amber.</p>
+      <div class="dash-table-scroll">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Vehicle type</th>
+              <th class="num">Bookings</th>
+              <th class="num">Completion</th>
+              <th class="num">Avg value</th>
+              <th class="num">Avg km</th>
+              <th class="num">Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="tableVehicle"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Pickup locations</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Top pickup points by volume</h3>
+      <p class="chart-sub">Cancellation rates at or above 33% are flagged. Transport hubs generate the most demand and lose the most of it.</p>
+      <div class="dash-table-scroll">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Pickup location</th>
+              <th class="num">Bookings</th>
+              <th class="num">Cancelled</th>
+              <th class="num">Cancel rate</th>
+              <th class="num">Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="tablePickup"></tbody>
+        </table>
+      </div>
+      <div class="chart-insight">
+        <strong>The three biggest pickup points are all transport hubs</strong> — a metro-adjacent
+        office cluster, an airport and a railway station. They also carry the highest cancellation
+        rates, which is where a targeted driver-incentive pilot would start.
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">Customer-reported cancellations</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>Why customers cancel</h3>
+      <p class="chart-sub">Smaller in volume than driver cancellations, but more diagnostic — these are the complaints customers choose to record.</p>
+      <div id="rankCustomerReasons" class="rank-list"></div>
+      <div class="chart-insight">
+        <strong>The top two customer reasons are both service-quality signals</strong>, not changes of
+        mind. &ldquo;Driver is not moving towards pickup location&rdquo; and &ldquo;AC is not working&rdquo;
+        together describe a driver who has accepted a ride they did not want.
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-section-title">About this dashboard</div>
+  <div class="chart-grid wide">
+    <div class="chart-card">
+      <h3>How it was built</h3>
+      <p class="chart-sub" id="dashSource"></p>
+      <p class="chart-sub" style="margin-top:.5rem">
+        Every figure on this page comes from an aggregation over <code>bdma.rides</code>. In
+        <a href="../lecture14/notes.html">Lecture 14</a> you write those pipelines by hand; in
+        <a href="../lecture15/notes.html">Lecture 15</a> you rebuild this view in MongoDB Atlas Charts;
+        in <a href="../lecture16/notes.html">Lecture 16</a> you turn it into a recommendation; and in
+        <a href="../lecture18/notes.html">Lecture 18</a> you compute the same numbers in Redis at write
+        time instead of read time.
+      </p>
+      <div class="chart-insight good">
+        <strong>The dataset is seeded and reproducible.</strong> Run
+        <code>node data/generate_uber_dataset.js</code> from the repository root and you will get these
+        exact numbers — which means the figures quoted in the lecture notes always match what you see here.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="../commands.html">Commands</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+
+<script src="../data/uber_summary.js"></script>
+<script src="../assets/js/dashboard.js"></script>
+</body>
+</html>

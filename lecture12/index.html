@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 12 Slides — MongoDB 101: The Document Model | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 12 · MongoDB 101: The Document Model</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 17</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 1 · Lecture 12</div>
+    <h1>MongoDB 101: The <span>Document</span> Model</h1>
+    <p class="lead">Documents, BSON, <code>_id</code>, flexible schema — and the one modelling decision that determines whether your database is fast or miserable.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO1</strong></span>
+      <span>📦 <strong>Lab: 15,000 rides</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Where We Are</div>
+    <h2>From "why" to "how"</h2>
+    <p>Lecture 11 argued that document databases exist because applications think in nested objects and tables do not. Today we stop arguing and start typing.</p>
+    <div class="cols">
+      <div class="box green">
+        <h3>You already have</h3>
+        <p>A free Atlas M0 cluster, a <code>bdma_student</code> user, and a connection string you saved somewhere safe.</p>
+      </div>
+      <div class="box accent">
+        <h3>You leave with</h3>
+        <p>15,000 Delhi NCR ride bookings in <code>bdma.rides</code> — the dataset every remaining lecture uses.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Today's real question:</strong> when related data appears, do you put it <em>inside</em> the document or <em>beside</em> it?</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Unit of Storage</div>
+    <h2>This is a document</h2>
+<pre><code>{
+  _id: ObjectId("65f1a2c4e8b9d4a1c2f30142"),
+  booking_id: "CNR3000142",
+  booked_at: ISODate("2024-03-14T18:22:07Z"),
+  status: "Completed",
+  customer_id: "CID482910",
+  vehicle_type: "Go Sedan",
+  route:   { pickup: "Connaught Place", drop: "Aerocity" },
+  booking_value: 412.50,
+  ride_distance: 18.4,
+  ratings: { driver: 4.6, customer: 4.8 },
+  payment_method: "UPI"
+}</code></pre>
+    <div class="note-strip">Relationally this is <strong>three tables and two joins</strong>. Here it is one object, one read, in the exact shape the app displays.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Mental Model</div>
+    <h2>The hierarchy, mapped to what you know</h2>
+    <table>
+      <thead><tr><th>MongoDB</th><th>Relational</th><th>In This Course</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Deployment</strong></td><td>Server / instance</td><td>Your Atlas M0 cluster</td></tr>
+        <tr><td><strong>Database</strong></td><td>Database</td><td><code>bdma</code></td></tr>
+        <tr><td><strong>Collection</strong></td><td>Table</td><td><code>rides</code></td></tr>
+        <tr><td><strong>Document</strong></td><td>Row</td><td><code>CNR3000142</code></td></tr>
+        <tr><td><strong>Field</strong></td><td>Column</td><td><code>booking_value</code>, <code>route.pickup</code></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>Three places the analogy breaks:</strong> no fixed columns · a value can be a whole structure · collections are created lazily, with no <code>CREATE TABLE</code>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Flexible Schema · Demonstrated</div>
+    <h2>Same collection, different shapes</h2>
+    <div class="cols">
+      <div class="box green">
+        <h3>Completed — 9,343</h3>
+<pre><code>{ status: "Completed",
+  avg_vtat: 7.4,
+  avg_ctat: 31.2,
+  booking_value: 412.50,
+  ride_distance: 18.4,
+  ratings: {driver:4.6,
+            customer:4.8},
+  payment_method: "UPI" }</code></pre>
+      </div>
+      <div class="box amber">
+        <h3>Cancelled by Driver — 2,698</h3>
+<pre><code>{ status:
+    "Cancelled by Driver",
+  avg_vtat: 2.84,
+  cancellation: {
+    by: "driver",
+    reason: "Personal &amp; Car
+             related issues" } }</code></pre>
+      </div>
+    </div>
+    <div class="note-strip">No fare, no distance, no rating — because <strong>the ride never happened</strong>. Absence <em>is</em> the data. 4,756 of 15,000 documents have no <code>booking_value</code>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Storage Format</div>
+    <h2>You write JSON. Mongo stores BSON.</h2>
+    <table>
+      <thead><tr><th></th><th>JSON</th><th>BSON</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Form</strong></td><td>Text</td><td>Binary</td></tr>
+        <tr><td><strong>Types</strong></td><td>6</td><td>~20 — <code>ObjectId</code>, <code>Date</code>, <code>Decimal128</code>, <code>Int32/64</code>, <code>Binary</code></td></tr>
+        <tr><td><strong>Field order</strong></td><td>Undefined</td><td>Preserved</td></tr>
+        <tr><td><strong>Reading one field</strong></td><td>Parse the whole string</td><td>Length-prefixed — <strong>skip straight to it</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>Why it costs money:</strong> a <code>Double</code> cannot hold ₹0.10 exactly. Sum a million fares and the ledger drifts. Money gets <code>Decimal128</code>; distances and ratings are fine as doubles.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Primary Key</div>
+    <h2>Every document has an <code>_id</code></h2>
+<pre><code>ObjectId("65f1a2c4  e8b9d4a1c2  f30142")
+          --------  ----------  ------
+          4 bytes   5 bytes     3 bytes
+          timestamp random      counter
+          (seconds) per process per process</code></pre>
+    <table>
+      <thead><tr><th>Component</th><th>Consequence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Timestamp</strong></td><td>Sorting by <code>_id</code> ≈ sorting by creation time, free, no extra index</td></tr>
+        <tr><td><strong>Random</strong></td><td>Twenty app servers can generate IDs at once without colliding</td></tr>
+        <tr><td><strong>Counter</strong></td><td>One process can generate thousands per second, still unique</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>The throughput point:</strong> <code>AUTO_INCREMENT</code> needs a round trip to a single shared counter. An <code>ObjectId</code> needs <strong>no coordination at all</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Discipline</div>
+    <h2>"Schemaless" is the most damaging word in NoSQL</h2>
+    <p>The schema does not disappear. It moves from the database into your application code, your analysts' queries, and your dashboards.</p>
+    <div class="cols">
+      <div class="box green">
+        <h3>What flexibility buys</h3>
+        <p>Additive change with no downtime · heterogeneity that matches reality · fast iteration while the record shape is still unknown.</p>
+      </div>
+      <div class="box amber">
+        <h3>What it costs</h3>
+        <p><code>payment_method</code> vs <code>paymentMethod</code> — both writes succeed, reports quietly undercount. <code>412.5</code> vs <code>"412.5"</code> — range queries silently skip the strings.</p>
+      </div>
+    </div>
+    <div class="note-strip">A team that never writes a validator has not chosen flexibility. It has chosen <strong>neglect</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Re-Tightening</div>
+    <h2><code>$jsonSchema</code> — strictness you opt into</h2>
+<pre><code>db.createCollection("rides", {
+  validator: { $jsonSchema: {
+    bsonType: "object",
+    required: ["booking_id", "booked_at", "status", "route"],
+    properties: {
+      booking_id: { bsonType: "string", pattern: "^CNR[0-9]{7}$" },
+      status: { enum: ["Completed", "Cancelled by Driver",
+                       "Cancelled by Customer", "No Driver Found",
+                       "Incomplete"] },
+      booking_value: { bsonType: ["double","int"], minimum: 0 }
+    } } },
+  validationLevel: "moderate",
+  validationAction: "error"
+})</code></pre>
+    <div class="note-strip">Note what is <strong>not</strong> required: <code>booking_value</code>. For 4,756 bookings its absence is correct. <code>validationAction: "warn"</code> first, <code>"error"</code> once the backlog is clean.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Core Decision</div>
+    <h2>Embed or reference?</h2>
+    <div class="cols">
+      <div class="box accent">
+        <h3>Embed</h3>
+<pre><code>{ booking_id: "CNR3000142",
+  route: { pickup: "CP",
+           drop: "Aerocity" },
+  ratings: { driver: 4.6,
+             customer: 4.8 } }</code></pre>
+        <p style="margin-top:.5rem">One query. No join. Atomic single-document write.</p>
+      </div>
+      <div class="box blue">
+        <h3>Reference</h3>
+<pre><code>// rides
+{ booking_id: "CNR3000142",
+  customer_id: "CID482910" }
+
+// customers
+{ _id: "CID482910",
+  name: "Priya Sharma" }</code></pre>
+        <p style="margin-top:.5rem">Two queries, or one <code>$lookup</code> in Lecture 14.</p>
+      </div>
+    </div>
+    <div class="note-strip">In SQL, normalisation decides this for you. In MongoDB <strong>you decide, every time</strong> — and this is where document models succeed or fail.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Rule of Thumb</div>
+    <h2>Five tests, one decision</h2>
+    <table>
+      <thead><tr><th>Test</th><th>Embed when…</th><th>Reference when…</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Access</strong></td><td>Read together with the parent</td><td>Read on its own</td></tr>
+        <tr><td><strong>Size</strong></td><td>Small and <strong>bounded</strong></td><td>Large or unbounded</td></tr>
+        <tr><td><strong>Change</strong></td><td>Changes with the parent</td><td>Changes independently</td></tr>
+        <tr><td><strong>Sharing</strong></td><td>Belongs to one parent</td><td>Shared by many parents</td></tr>
+        <tr><td><strong>Cardinality</strong></td><td>One-to-one, one-to-few</td><td>One-to-many, many-to-many</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Compressed: <strong>embed what is read together, bounded, and changes together.</strong> When the tests disagree, <strong>access pattern wins</strong> — it is what users feel.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Applied</div>
+    <h2>Our dataset, decided</h2>
+    <table>
+      <thead><tr><th>Relationship</th><th>Call</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Booking → route</td><td><strong>Embed</strong></td><td>Two fields, fixed at booking time, never read alone</td></tr>
+        <tr><td>Booking → ratings</td><td><strong>Embed</strong></td><td>Two scalars, written once at trip end</td></tr>
+        <tr><td>Booking → cancellation</td><td><strong>Embed</strong></td><td>Same business event, present only when relevant</td></tr>
+        <tr><td>Booking → customer</td><td><strong>Reference</strong></td><td>One customer, hundreds of rides; a phone change must not rewrite history</td></tr>
+        <tr><td>Customer → bookings</td><td><strong>Reference</strong></td><td>Unbounded — a commuter adds 500 a year, forever</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>Hybrid:</strong> embed a snapshot <code>customer: { id, name }</code> to skip the join. The name on an old receipt staying old is arguably <em>correct</em>, not a bug.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Hard Limit</div>
+    <h2>16 MB per document — and the trap it catches</h2>
+<pre><code>// ANTI-PATTERN
+{ _id: "CID482910",
+  name: "Priya Sharma",
+  bookings: [
+    { booking_id: "CNR3000142", value: 412.50 },
+    { booking_id: "CNR3000288", value: 180.00 },
+    // ...one more every day, forever
+  ] }</code></pre>
+    <div class="cols">
+      <div class="box amber">
+        <h3>Four failures</h3>
+        <p>Grows without bound · reading the name drags the whole history · every write relocates the document · a multikey index gets 5,000 entries per doc.</p>
+      </div>
+      <div class="box green">
+        <h3>The fix</h3>
+        <p><code>rides</code> as its own collection with <code>customer_id</code> on each booking — exactly how our dataset is shaped.</p>
+      </div>
+    </div>
+    <div class="note-strip">Arrays are fine when <strong>bounded</strong>: <code>tags</code>, <code>saved_addresses</code>, <code>fare_breakdown</code>. If you cannot state the maximum with a straight face, reference.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Getting In</div>
+    <h2>Three doors to the same cluster</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>⌨️ mongosh</h3>
+        <p>JavaScript REPL with the database API attached. Everything in Lectures 13–16 is written for it.</p>
+      </div>
+      <div class="box">
+        <h3>🖥️ Compass</h3>
+        <p>GUI: browse, build queries visually, read the inferred schema, chart explain plans.</p>
+      </div>
+      <div class="box">
+        <h3>🔌 Drivers</h3>
+        <p>Node, Python, Java, C#, Go. Production code — and the Lecture 20 dashboard.</p>
+      </div>
+    </div>
+<pre><code>mongosh "mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/"
+
+# safer — prompt for the password instead of typing it
+mongosh "mongodb+srv://cluster0.xxxxx.mongodb.net/" --username bdma_student</code></pre>
+    <div class="note-strip"><strong>⚠️ That string is a live credential.</strong> Local <code>.env</code>, listed in <code>.gitignore</code>. Never a commit, a screenshot, or a Slack message.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Lab · Part 1</div>
+    <h2>First document, by hand</h2>
+<pre><code>use bdma
+db                                // -> bdma
+show collections                  // -> (empty)
+
+db.rides.insertOne({
+  booking_id: "CNR9999001",
+  booked_at: new Date("2024-03-14T18:22:07Z"),
+  status: "Completed",
+  customer_id: "CID482910",
+  vehicle_type: "Go Sedan",
+  route: { pickup: "Connaught Place", drop: "Aerocity" },
+  booking_value: 412.50,
+  ride_distance: 18.4,
+  ratings: { driver: 4.6, customer: 4.8 },
+  payment_method: "UPI"
+})
+
+db.rides.find()
+show collections                  // -> rides</code></pre>
+    <div class="note-strip"><code>use</code> creates nothing. The database and collection spring into existence on the <strong>first write</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Lab · Part 2</div>
+    <h2>Import 15,000 real bookings</h2>
+<pre><code># in mongosh — clear your test docs first
+db.rides.deleteMany({})</code></pre>
+<pre><code># in your terminal, from the repo root
+mongoimport --uri "mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/bdma" \
+  --collection rides --file data/uber_bookings.json --jsonArray</code></pre>
+<pre><code>db.rides.countDocuments()                          // 15000
+db.rides.countDocuments({ status: "Completed" })   // 9343
+
+// turn booked_at from string into a real BSON Date
+db.rides.updateMany(
+  { booked_at: { $type: "string" } },
+  [ { $set: { booked_at: { $toDate: "$booked_at" } } } ]
+)</code></pre>
+    <div class="note-strip">Then open <strong>Compass → Schema tab</strong>: <code>booking_value</code> appears in only ~68% of documents. Not an error — the hook for Lecture 13.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Wrap-Up</div>
+    <h2>Six things to carry forward</h2>
+    <ol>
+      <li><strong>A document is the unit of storage, and it nests.</strong> Collections have no fixed columns; fields can hold whole structures.</li>
+      <li><strong>You write JSON, Mongo stores BSON.</strong> Real types, preserved order, fast traversal. Money gets <code>Decimal128</code>.</li>
+      <li><strong><code>_id</code> is mandatory; <code>ObjectId</code> is 12 bytes</strong> — timestamp + random + counter, so it is time-sortable and needs no coordination.</li>
+      <li><strong>Flexible schema defers the strictness decision — it does not delete it.</strong> <code>$jsonSchema</code> is how you take it back.</li>
+      <li><strong>Embed what is read together, bounded, and changes together.</strong> Reference what is large, unbounded, shared, or independent.</li>
+      <li><strong>16 MB is a smoke alarm.</strong> The unbounded array is the fire it is listening for.</li>
+    </ol>
+    <div class="note-strip"><strong>Next — Lecture 13:</strong> CRUD, the operator families, dot notation, projection and paging. <strong>Arrive with 15,000 documents loaded and verified.</strong></div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

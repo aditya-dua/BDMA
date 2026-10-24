@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 11 — Introduction to Non-Relational Databases | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 11 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 1</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 1 · Lecture 11</div>
+  <h1>Introduction to Non-Relational Databases</h1>
+  <p class="subtitle">Why the relational model cracked at web scale — and the four NoSQL families that replaced it</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO1</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lectures 1–10 (relational foundations, SQL)</span>
+    <span>🔧 <strong>Lab:</strong> MongoDB Atlas free-tier signup</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#why">Why Relational Databases Hit a Wall</a></li>
+      <li><a href="#scaling">Scaling: Vertical vs Horizontal</a></li>
+      <li><a href="#cap">CAP Theorem and the ACID/BASE Trade-Off</a></li>
+      <li><a href="#families">The Four Families of NoSQL</a></li>
+      <li><a href="#choosing">A Manager's Decision Framework</a></li>
+      <li><a href="#myths">Five Myths Worth Killing</a></li>
+      <li><a href="#lab">Hands-On — Create Your Atlas Cluster</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Explain the three pressures — scale, schema change, and developer velocity — that pushed the industry beyond relational databases</li>
+    <li><span class="check">✓</span> Distinguish vertical from horizontal scaling and explain why sharding breaks SQL joins</li>
+    <li><span class="check">✓</span> State the CAP theorem correctly and apply it to a real business scenario</li>
+    <li><span class="check">✓</span> Compare ACID and BASE consistency models and judge which a given workload needs</li>
+    <li><span class="check">✓</span> Classify the four NoSQL families and name a production system in each</li>
+    <li><span class="check">✓</span> Apply a structured framework to recommend a database for a business problem</li>
+    <li><span class="check">✓</span> Provision a free MongoDB Atlas cluster ready for Lecture 12</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–8 min</td><td>Recap &amp; Framing</td><td>Where Lectures 1–10 left us; the question this module answers</td></tr>
+      <tr><td>8–22 min</td><td>The Breaking Point</td><td>Three forces that outgrew the relational model</td></tr>
+      <tr><td>22–35 min</td><td>Scaling Models</td><td>Vertical vs horizontal; why sharding kills joins</td></tr>
+      <tr><td>35–50 min</td><td>CAP &amp; Consistency</td><td>CAP theorem, ACID vs BASE, business consequences</td></tr>
+      <tr><td>50–68 min</td><td>The Four Families</td><td>Key-value, document, column-family, graph — with real systems</td></tr>
+      <tr><td>68–80 min</td><td>Decision Framework</td><td>Group exercise: pick a database for three scenarios</td></tr>
+      <tr><td>80–88 min</td><td>Atlas Lab</td><td>Create a free cluster and a database user</td></tr>
+      <tr><td>88–90 min</td><td>Wrap-Up</td><td>Assignment 1 brief and Lecture 12 preview</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="why">Section 1: Why Relational Databases Hit a Wall</h2>
+
+  <p>The relational model is one of the most successful ideas in computing. Edgar Codd published it in 1970; by 1990 it was the undisputed default, and it remains the correct answer for a large share of business systems. <strong>Nothing in this module argues that SQL is obsolete.</strong> The argument is narrower and more useful: between roughly 2004 and 2010, a specific set of workloads appeared that the relational model served badly, and the industry built new tools for them.</p>
+
+  <p>Understanding <em>which</em> workloads those are is the difference between a manager who picks technology on merit and one who picks it on fashion.</p>
+
+  <h3>Pressure 1 — Data Volume Outgrew the Single Machine</h3>
+  <p>A relational database is designed around one authoritative server. You make it faster by making that server bigger. That strategy works beautifully until your dataset no longer fits on the largest server money can buy — and by the mid-2000s, Google, Amazon, and Facebook had crossed that line.</p>
+
+  <div class="callout blue">
+    <p><strong>Scale in context:</strong> A well-tuned PostgreSQL instance comfortably handles terabytes. The companies that invented NoSQL were managing petabytes — a thousandfold difference. If your data fits on one big server, the relational model is almost certainly still your best option.</p>
+  </div>
+
+  <h3>Pressure 2 — Schemas Became a Release Bottleneck</h3>
+  <p>A relational table requires you to declare every column, with its type, before you insert a single row. That rigidity is a feature: it guarantees structure. It becomes a liability when the business changes shape faster than the schema can be migrated.</p>
+
+  <p>Consider a product catalogue. A book has an author, an ISBN, and a page count. A refrigerator has a capacity in litres, an energy rating, and a door configuration. A pair of shoes has a size, a colour, and a material. In a relational schema you resolve this with one of three unattractive options:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Option</th><th>How It Works</th><th>What It Costs</th></tr></thead>
+    <tbody>
+      <tr><td><strong>One wide table</strong></td><td>Every attribute of every product type becomes a column</td><td>Hundreds of mostly-<code>NULL</code> columns; adding a product type means an <code>ALTER TABLE</code></td></tr>
+      <tr><td><strong>Table per type</strong></td><td>A separate table for books, appliances, footwear</td><td>Querying "all products under ₹2,000" means a <code>UNION</code> across dozens of tables</td></tr>
+      <tr><td><strong>Entity-Attribute-Value</strong></td><td>One generic table of <code>(product, attribute, value)</code> rows</td><td>Everything is a string; the database can no longer validate or index meaningfully</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>A document database sidesteps the dilemma: each product is a document, and each document carries exactly the fields that product needs.</p>
+
+  <h3>Pressure 3 — The Object-Relational Impedance Mismatch</h3>
+  <p>Application code works with nested objects. A customer <em>has</em> a list of addresses, which each <em>have</em> a postcode. Relational storage cannot nest, so that single conceptual object is shredded across three or four tables on write and reassembled with joins on read.</p>
+
+  <pre><code>// What the application wants to work with
+{
+  name: "Priya Sharma",
+  addresses: [
+    { type: "home", city: "Delhi",  pin: "110001" },
+    { type: "work", city: "Gurgaon", pin: "122002" }
+  ]
+}
+
+// What a relational schema requires
+customers(id, name)
+addresses(id, customer_id, type, city, pin)
+-- plus a JOIN on every single read</code></pre>
+
+  <div class="callout">
+    <p><strong>The business translation:</strong> impedance mismatch is not an aesthetic complaint. It is paid for in developer hours — writing mapping layers, debugging join logic, and managing migrations. For a product team shipping weekly, that overhead is a direct drag on time-to-market.</p>
+  </div>
+
+  <h2 id="scaling">Section 2: Scaling — Vertical vs Horizontal</h2>
+
+  <p>This single distinction explains most of what follows, so it is worth getting precisely right.</p>
+
+  <div class="panel-grid">
+    <div class="panel-card">
+      <h3>⬆️ Vertical Scaling (Scale Up)</h3>
+      <p>Buy a bigger machine: more CPU, more RAM, faster disk. Simple, requires no application change, and keeps all data in one place so joins and transactions stay easy.</p>
+      <p style="margin-top:.5rem"><strong>Limits:</strong> cost rises faster than capacity, there is a hard physical ceiling, and the machine remains a single point of failure.</p>
+    </div>
+    <div class="panel-card">
+      <h3>➡️ Horizontal Scaling (Scale Out)</h3>
+      <p>Add more commodity machines and spread the data across them. Capacity grows almost linearly, cost stays proportional, and losing one node need not take the system down.</p>
+      <p style="margin-top:.5rem"><strong>Limits:</strong> the data is now distributed, which makes joins, transactions, and consistency genuinely hard.</p>
+    </div>
+  </div>
+
+  <h3>Why Sharding Breaks Joins</h3>
+  <p><strong>Sharding</strong> means splitting a dataset across servers by some key — customers A–M on Server 1, N–Z on Server 2. Each server independently handles its slice, which is exactly what makes horizontal scaling work.</p>
+
+  <p>Now run a join. <code>SELECT ... FROM orders JOIN customers</code> requires matching every order against every customer. If orders live on Server 1 and the matching customers live on Server 2, the database must ship data across the network mid-query. On a dataset of any size, this is catastrophically slow.</p>
+
+  <div class="callout amber">
+    <p><strong>The core insight of NoSQL:</strong> rather than making distributed joins fast — which is close to impossible — restructure the data so the join is never needed. Store the order <em>with</em> its customer details embedded. You trade some duplication for the ability to scale horizontally. Every design decision in this module descends from that trade.</p>
+  </div>
+
+  <h2 id="cap">Section 3: CAP Theorem and the ACID/BASE Trade-Off</h2>
+
+  <p>Eric Brewer's CAP theorem (2000) is the most cited and most misquoted idea in distributed data. Stated carefully, it says that a distributed system can guarantee at most two of three properties:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Property</th><th>Meaning</th><th>If You Lose It</th></tr></thead>
+    <tbody>
+      <tr><td><strong>C — Consistency</strong></td><td>Every read returns the most recent write</td><td>Different users may briefly see different answers</td></tr>
+      <tr><td><strong>A — Availability</strong></td><td>Every request receives a response</td><td>Some requests fail or time out</td></tr>
+      <tr><td><strong>P — Partition tolerance</strong></td><td>The system keeps working when the network splits</td><td>A network fault takes the whole system down</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The correction most people need:</strong> you do not get to choose whether to have partitions. Networks fail — cables are cut, switches reboot, data centres lose connectivity. Partition tolerance is therefore mandatory for any real distributed system. The genuine choice is what to do <em>during</em> a partition: refuse requests to protect correctness (CP), or answer them and reconcile afterwards (AP).</p>
+  </div>
+
+  <h3>Reading CAP as a Business Decision</h3>
+  <p>Make it concrete. The network between two data centres fails. Each side can still serve customers, but they cannot talk to each other.</p>
+
+  <div class="panel-grid">
+    <div class="panel-card">
+      <h3>CP — Choose Consistency</h3>
+      <p><strong>Scenario:</strong> a bank transfer. The system refuses the transaction rather than risk double-spending the same balance.</p>
+      <p style="margin-top:.5rem"><strong>Customer sees:</strong> "Service temporarily unavailable."</p>
+      <p style="margin-top:.5rem"><strong>Systems:</strong> MongoDB (default), HBase, Redis in cluster mode.</p>
+    </div>
+    <div class="panel-card">
+      <h3>AP — Choose Availability</h3>
+      <p><strong>Scenario:</strong> a shopping cart. Accept the item now and reconcile the two versions when the network heals — a slightly stale cart beats a lost sale.</p>
+      <p style="margin-top:.5rem"><strong>Customer sees:</strong> a working site.</p>
+      <p style="margin-top:.5rem"><strong>Systems:</strong> Cassandra, DynamoDB, CouchDB.</p>
+    </div>
+  </div>
+
+  <h3>ACID vs BASE</h3>
+  <p>These are the two consistency philosophies that follow from the CAP choice.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>ACID (traditional)</th><th>BASE (distributed)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Stands for</strong></td><td>Atomicity, Consistency, Isolation, Durability</td><td>Basically Available, Soft state, Eventual consistency</td></tr>
+      <tr><td><strong>Promise</strong></td><td>A transaction fully succeeds or fully fails; the data is never in between</td><td>The system always answers; replicas converge shortly afterwards</td></tr>
+      <tr><td><strong>Optimises for</strong></td><td>Correctness</td><td>Availability and scale</td></tr>
+      <tr><td><strong>Right for</strong></td><td>Payments, ledgers, inventory, bookings</td><td>Feeds, recommendations, analytics, telemetry, sessions</td></tr>
+      <tr><td><strong>Wrong for</strong></td><td>Workloads needing global write scale</td><td>Anything where a stale read costs real money</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>How the debate actually resolved:</strong> the hard either/or of 2010 has softened. MongoDB has supported multi-document ACID transactions since version 4.0 (2018), and most cloud databases now let you choose a consistency level per operation. The modern skill is not picking a camp — it is knowing which guarantee each individual operation requires.</p>
+  </div>
+
+  <h2 id="families">Section 4: The Four Families of NoSQL</h2>
+
+  <p>"NoSQL" is an unhelpfully broad label — it describes what these systems are not. The useful taxonomy is by <em>data model</em>, and there are four.</p>
+
+  <h3>1. Key-Value Stores</h3>
+  <p>The simplest possible model: a giant dictionary. You supply a key, you get back a value, and the database does not inspect or interpret that value.</p>
+  <pre><code>SET  user:8471:session  "{token: 'a9f3...', expires: 1735689600}"
+GET  user:8471:session</code></pre>
+  <p><strong>Strength:</strong> extraordinary speed — sub-millisecond lookups, because there is no query planning to do. <strong>Weakness:</strong> you can only retrieve by key. There is no "find all sessions expiring today" unless you build that index yourself.</p>
+  <p><strong>Systems:</strong> Redis, Amazon DynamoDB, Memcached, etcd. <strong>Typical uses:</strong> caching, session storage, rate limiting, leaderboards, real-time counters.</p>
+  <div class="callout blue">
+    <p>You will work with Redis directly in Lectures 17–18, building a live analytics dashboard on top of its bitmap and counter structures.</p>
+  </div>
+
+  <h3>2. Document Databases</h3>
+  <p>The value is no longer opaque. Each record is a structured document — typically JSON — and the database can query <em>inside</em> it, index nested fields, and enforce optional validation rules.</p>
+  <pre><code>{
+  "_id": "CNR3000142",
+  "status": "Completed",
+  "vehicle_type": "Go Sedan",
+  "route": { "pickup": "Connaught Place", "drop": "Aerocity" },
+  "booking_value": 412.50,
+  "ratings": { "driver": 4.6, "customer": 4.8 }
+}</code></pre>
+  <p><strong>Strength:</strong> the stored shape matches the application's shape, so the impedance mismatch disappears. Related data lives together, which removes most joins. <strong>Weakness:</strong> data duplicated across documents must be kept consistent by the application.</p>
+  <p><strong>Systems:</strong> MongoDB, Couchbase, Firestore, DocumentDB. <strong>Typical uses:</strong> product catalogues, user profiles, content management, event and booking records.</p>
+  <div class="callout blue">
+    <p>This is the family the course focuses on. Lectures 12–16 are built entirely on MongoDB.</p>
+  </div>
+
+  <h3>3. Column-Family Stores</h3>
+  <p>Data is stored by column rather than by row. Reading one column across a billion rows touches only that column's data on disk instead of dragging every other field along with it.</p>
+  <p><strong>Strength:</strong> enormous write throughput and very fast aggregation over single attributes. <strong>Weakness:</strong> the data model is rigid and query patterns must be designed up front — you cannot explore ad hoc.</p>
+  <p><strong>Systems:</strong> Apache Cassandra, HBase, ScyllaDB, Google Bigtable. <strong>Typical uses:</strong> time-series and sensor data, message histories, write-heavy telemetry at scale.</p>
+
+  <h3>4. Graph Databases</h3>
+  <p>The relationships <em>are</em> the data. Nodes represent entities and edges represent connections, both of which can carry properties.</p>
+  <pre><code>(Priya)-[:PURCHASED]->(iPhone 15)
+(Priya)-[:FOLLOWS]->(Rahul)-[:PURCHASED]->(AirPods)
+// "What did people Priya follows buy?" — one hop, not a 5-table self-join</code></pre>
+  <p><strong>Strength:</strong> traversing relationships is constant-time regardless of total dataset size, which is exactly where SQL degrades. <strong>Weakness:</strong> poor at bulk aggregation; a smaller talent pool.</p>
+  <p><strong>Systems:</strong> Neo4j, Amazon Neptune, ArangoDB, TigerGraph. <strong>Typical uses:</strong> fraud rings, recommendation engines, social networks, supply-chain and ownership mapping.</p>
+
+  <h3>Side-by-Side Comparison</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Family</th><th>Query By</th><th>Best At</th><th>Avoid When</th><th>Flagship</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Key-Value</strong></td><td>Key only</td><td>Raw speed, caching</td><td>You need to search by value</td><td>Redis</td></tr>
+      <tr><td><strong>Document</strong></td><td>Any field</td><td>Flexible, evolving records</td><td>Heavy multi-entity joins</td><td>MongoDB</td></tr>
+      <tr><td><strong>Column-Family</strong></td><td>Partition + clustering key</td><td>Massive write volume</td><td>Ad-hoc exploration</td><td>Cassandra</td></tr>
+      <tr><td><strong>Graph</strong></td><td>Traversal</td><td>Deep relationships</td><td>Bulk aggregation</td><td>Neo4j</td></tr>
+      <tr><td><strong>Relational</strong></td><td>SQL</td><td>Transactions, reporting</td><td>Petabyte horizontal scale</td><td>PostgreSQL</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="choosing">Section 5: A Manager's Decision Framework</h2>
+
+  <p>You will rarely write the migration yourself. You will frequently be in the room when the choice is made, and the questions below are the ones that actually settle it.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>What is the access pattern?</strong> Write down the three queries the system will run most often. Choose the database that serves those three well — not the one with the best feature list.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>How much does a stale read cost?</strong> If the answer is "a rupee", you need ACID. If it is "a slightly out-of-date view count", eventual consistency is fine and far cheaper.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>How fast does the schema change?</strong> Monthly changes to the shape of a record favour a document model. A stable schema that has not moved in three years favours relational.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>What is the realistic data volume in three years?</strong> Be honest. Most systems never leave single-server territory, and adopting a distributed database you do not need imports complexity for free.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>Who will operate it at 3 a.m.?</strong> The best database for a team that cannot run it is the wrong database. Managed services such as MongoDB Atlas exist largely to answer this question.</p></div>
+  </div>
+
+  <h3>In-Class Exercise — Three Scenarios</h3>
+  <p>In groups, choose a family for each and defend it in one sentence.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Scenario</th><th>Decisive Question</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>A ride-hailing firm stores 150,000 bookings a year. Fields differ by product line, and analysts need ad-hoc queries on any attribute.</td><td>Flexible shape + query any field</td></tr>
+      <tr><td>2</td><td>An e-commerce site must show a live "trending products in the last 5 minutes" strip on every page load.</td><td>Sub-millisecond reads; staleness is harmless</td></tr>
+      <tr><td>3</td><td>An insurer wants to find rings of claimants who share addresses, phone numbers, and repair garages.</td><td>Relationship depth, not volume</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout green">
+    <p><strong>Intended answers:</strong> (1) Document — this is precisely the Uber dataset you will model from Lecture 12 onward. (2) Key-value — Redis, which you will build in Lecture 17. (3) Graph — a fraud ring is a traversal problem, and SQL self-joins collapse beyond three hops.</p>
+  </div>
+
+  <h2 id="myths">Section 6: Five Myths Worth Killing</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Myth</th><th>Reality</th></tr></thead>
+    <tbody>
+      <tr><td>"NoSQL means no SQL"</td><td>It means "not only SQL". Several NoSQL systems ship SQL-like query languages.</td></tr>
+      <tr><td>"NoSQL has no schema"</td><td>The schema moves from the database into the application — and it is still there. MongoDB also offers explicit schema validation.</td></tr>
+      <tr><td>"NoSQL cannot do transactions"</td><td>MongoDB has supported multi-document ACID transactions since 4.0 (2018).</td></tr>
+      <tr><td>"NoSQL is always faster"</td><td>Only for the access patterns it was designed for. A badly modelled document database is slower than a well-indexed SQL table.</td></tr>
+      <tr><td>"NoSQL replaces relational"</td><td>Most large organisations run both. The term for this is <strong>polyglot persistence</strong> — the right store for each job.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="lab">Section 7: Hands-On — Create Your Atlas Cluster</h2>
+  <p>Everything from Lecture 12 onward needs a running MongoDB cluster. The free M0 tier is permanent, requires no credit card, and gives you 512 MB — comfortably more than this course needs.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p>Go to <a href="https://www.mongodb.com/cloud/atlas/register" target="_blank" rel="noopener">mongodb.com/cloud/atlas/register</a> and sign up. Use your student email — it also unlocks the MongoDB Student Pack.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p>Create a project named <code>BDMA</code>, then <strong>Build a Cluster</strong> → choose the <strong>M0 Free</strong> tier.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p>Pick the region closest to you (<code>ap-south-1 / Mumbai</code> for India). Region affects latency, not cost, on the free tier.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Security → Database Access → Add New User.</strong> Create user <code>bdma_student</code> with a password you record somewhere safe. Grant <code>readWriteAnyDatabase</code>.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>Security → Network Access → Add IP Address → Allow Access from Anywhere</strong> (<code>0.0.0.0/0</code>). This is acceptable for a teaching cluster only — never for production.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body"><p><strong>Connect → Drivers</strong> and copy your connection string. It looks like the line below. Save it; Lecture 12 starts here.</p>
+    <pre><code>mongodb+srv://bdma_student:&lt;password&gt;@cluster0.xxxxx.mongodb.net/</code></pre></div>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Never commit a connection string to GitHub.</strong> It contains a live password. Automated scanners find exposed Atlas credentials within minutes of a public push. Keep it in a local <code>.env</code> file and add that file to <code>.gitignore</code>.</p>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>Relational databases did not fail</strong> — a new class of workload appeared that they served badly. Volume, schema churn, and impedance mismatch were the three pressures.</li>
+      <li><strong>Horizontal scaling is the root cause of everything else.</strong> Once data is sharded across machines, joins become expensive, which forces a different way of modelling data.</li>
+      <li><strong>Partition tolerance is not optional.</strong> The real CAP decision is how the system behaves during a network split: refuse writes (CP) or accept them and reconcile (AP).</li>
+      <li><strong>There are four families, not one "NoSQL".</strong> Key-value for speed, document for flexibility, column-family for write volume, graph for relationships.</li>
+      <li><strong>Choose by access pattern, cost of staleness, and operational capability</strong> — never by popularity.</li>
+      <li><strong>Polyglot persistence is normal.</strong> Mature organisations run several databases, each doing the job it is best at.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 12 — MongoDB 101 &amp; the Document Model</h3>
+    <p>We move from theory to the keyboard. You will learn how BSON documents are structured, make the central modelling decision of embedding versus referencing, and load your first collection into the Atlas cluster you just created. Bring your connection string.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../index.html">← Course Home</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture12/notes.html">Lecture 12 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

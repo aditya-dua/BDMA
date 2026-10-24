@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 19 — Project Presentations I | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 19 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 5</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 5 · Lecture 19</div>
+  <h1>Project Presentations I</h1>
+  <p class="subtitle">The capstone brief, the rubric you are marked against, and the run sheet for presentation day</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>👥 <strong>Teams of 3–4</strong></span>
+    <span>📦 <strong>Deliverable:</strong> model + dashboard + one defensible recommendation</span>
+    <span>🎤 <strong>Format:</strong> 12 min present + 5 min Q&amp;A</span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#brief">The Project Brief in Full</a></li>
+      <li><a href="#dataset">Choosing Your Dataset</a></li>
+      <li><a href="#requirements">Mandatory Technical Requirements</a></li>
+      <li><a href="#format">The Presentation Format</a></li>
+      <li><a href="#rubric">The Grading Rubric</a></li>
+      <li><a href="#failures">Common Failure Modes</a></li>
+      <li><a href="#runsheet">Run Sheet, Peer Review &amp; Demo Hygiene</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> State a business problem precisely enough that a dataset can be held accountable to it</li>
+    <li><span class="check">✓</span> Justify a non-relational data model — embedding, referencing, or key schema — against the access pattern it serves</li>
+    <li><span class="check">✓</span> Demonstrate technical execution through an aggregation pipeline, an index decision, or a documented Redis key design</li>
+    <li><span class="check">✓</span> Build a dashboard whose every chart answers a question someone asked</li>
+    <li><span class="check">✓</span> Convert an analytical finding into a quantified recommendation with an expected impact</li>
+    <li><span class="check">✓</span> Present to a sceptical business audience inside a hard 12-minute limit and defend the work under questioning</li>
+    <li><span class="check">✓</span> Evaluate peer work against the same rubric you are marked by</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <p>The timings below assume a worked example of a <strong>ten-team cohort</strong> — five teams present today, five in Lecture 20. The lecturer adjusts slot length to the actual cohort size; the arithmetic, not the format, is what changes.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–4 min</td><td>Opening &amp; Ground Rules</td><td>Timing protocol, Q&amp;A etiquette, peer-evaluation forms distributed</td></tr>
+      <tr><td>4–21 min</td><td>Team 1</td><td>12 min presentation + 5 min Q&amp;A (hard stop at 12:00)</td></tr>
+      <tr><td>21–38 min</td><td>Team 2</td><td>12 min presentation + 5 min Q&amp;A</td></tr>
+      <tr><td>38–55 min</td><td>Team 3</td><td>12 min presentation + 5 min Q&amp;A</td></tr>
+      <tr><td>55–72 min</td><td>Team 4</td><td>12 min presentation + 5 min Q&amp;A</td></tr>
+      <tr><td>72–89 min</td><td>Team 5</td><td>12 min presentation + 5 min Q&amp;A</td></tr>
+      <tr><td>89–90 min</td><td>Close</td><td>Peer forms collected; running order for Lecture 20 confirmed</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="callout blue">
+    <p><strong>Why the opening is only four minutes:</strong> five seventeen-minute slots consume eighty-five of the ninety available. Everything administrative that can be read in advance — this page — is not repeated in the room. Arrive having read it.</p>
+  </div>
+
+  <h2 id="brief">Section 1: The Project Brief in Full</h2>
+
+  <p>This page does two jobs. In the weeks before the session it is the <strong>brief</strong> you build against. On the day itself it is the <strong>run sheet</strong>. Both halves are below; read the brief now and the run sheet again the night before.</p>
+
+  <h3>The Deliverable, in One Sentence</h3>
+  <div class="callout">
+    <p>Take a real dataset, model it in a non-relational database, build a dashboard on top of it, and present a business recommendation that the data actually supports.</p>
+  </div>
+
+  <p>Four nouns in that sentence carry weight, and each is a place teams lose marks.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Word</th><th>What It Demands</th><th>How Teams Get It Wrong</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Real</strong></td><td>Data someone generated by doing something — transactions, logs, filings, sensor readings</td><td>A synthetic toy file with 200 perfectly clean rows and no missing values</td></tr>
+      <tr><td><strong>Model</strong></td><td>A deliberate decision about shape: what is embedded, what is referenced, how keys are named</td><td>Dumping a CSV into one flat collection and calling it a document model</td></tr>
+      <tr><td><strong>Dashboard</strong></td><td>A view a named decision-maker would open on a Monday morning</td><td>Charts built because the tool offered them</td></tr>
+      <tr><td><strong>Recommendation</strong></td><td>An action, an owner, and a number attached to the expected effect</td><td>"The business should look into this further"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Team Composition</h3>
+  <p>Teams of <strong>three to four</strong>. Smaller teams are permitted but are marked against the same rubric — there is no scaling for headcount, so a pair should scope accordingly. Larger teams are not permitted; five people on a project of this size reliably produces two passengers.</p>
+
+  <p>Divide the work by <em>stage</em>, not by <em>chart</em>. A workable split for a team of four:</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>Data owner</strong> — sourcing, cleaning, loading, and documenting what was thrown away and why. This is the least glamorous role and the one the Q&amp;A punishes hardest if nobody did it.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>Model owner</strong> — the embed-versus-reference decision, or the Redis key schema. Must be able to answer "why not the other way?" in one sentence.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>Query owner</strong> — the aggregation pipelines, the index work, the <code>explain()</code> evidence. Owns the performance story.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Narrative owner</strong> — the dashboard layout, the slide arc, and the recommendation. Decides what gets cut, which is the hardest call on the team.</p></div>
+  </div>
+
+  <p>Every team member must speak during the twelve minutes. A team that fields one presenter and three spectators loses marks under <em>Presentation &amp; Q&amp;A</em>, and the silent members are exposed in questioning.</p>
+
+  <h2 id="dataset">Section 2: Choosing Your Dataset</h2>
+
+  <p>You may use the course dataset — <code>bdma.rides</code>, the 15,000 Delhi NCR ride bookings you have worked with since Lecture 12 — or bring your own. <strong>Bringing your own is strongly encouraged</strong>, and here is the honest reason: the Uber dataset has been mined in front of you for six lectures. You already know that 62.29% of bookings complete, that drivers cancel 17.99% of them, that the estimated revenue leak is ₹13,33,539, that 18:00 is the busiest hour at 1,373 bookings, and that the worst failure rate among the hours that actually carry volume is 17:00 at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062. Finding those numbers again demonstrates that you can follow instructions. Finding something new in an unfamiliar dataset demonstrates that you can do the job.</p>
+
+  <div class="callout amber">
+    <p><strong>If you do use the Uber dataset,</strong> you must take it somewhere Lectures 15–18 did not. Segment by vehicle type and pricing tier, build a driver-reliability score, model the cancellation funnel as a sequence rather than a count, or join it against weather or a public holiday calendar. Re-presenting the course dashboard is marked as an adequate pass at best.</p>
+  </div>
+
+  <h3>Where to Source Data</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Source</th><th>What You Will Find</th><th>Watch For</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Kaggle</strong></td><td>Tens of thousands of datasets with documented columns; retail, logistics, healthcare, churn, reviews</td><td>Over-used headline datasets (Titanic, Iris, Netflix titles) — pick something with fewer than a hundred public notebooks</td></tr>
+      <tr><td><strong>data.gov.in</strong></td><td>Indian open government data: crop prices, rail punctuality, consumption, census extracts, pollution monitoring</td><td>Inconsistent encodings and column names that change between annual files — this is realistic, and the cleaning story earns marks</td></tr>
+      <tr><td><strong>RBI Database on the Indian Economy</strong></td><td>Banking, payments, credit, state-level macro series</td><td>Mostly time series; strong for Redis counters and trend dashboards, weak for document modelling unless enriched</td></tr>
+      <tr><td><strong>NSE / BSE public data</strong></td><td>Daily bhavcopy, index constituents, corporate actions, delivery percentages</td><td>High volume and high temptation to build a trading signal — stay on the analytics side of that line</td></tr>
+      <tr><td><strong>Your workplace or internship</strong></td><td>The highest-value option: a dataset with a real decision-maker attached</td><td><strong>Clear it first.</strong> Anonymise identifiers, scale or mask revenue figures, and never commit the raw file to a public repository</td></tr>
+      <tr><td><strong>Public APIs</strong></td><td>Weather, transit, GitHub events, Wikipedia pageviews — genuinely streaming, which suits Redis</td><td>Rate limits; collect over several days rather than in one burst the night before</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The Size Test</h3>
+  <p>Aim for roughly <strong>5,000 to 500,000 records</strong>. Below five thousand, no modelling or indexing decision has observable consequences and your <code>explain()</code> comparison will show nothing. Above half a million, the free Atlas M0 tier and your loading script become the project. The course dataset sits at 15,000 for exactly this reason.</p>
+
+  <div class="callout green">
+    <p><strong>A good test before committing:</strong> write down the three questions your dashboard will answer, then check the dataset actually contains the columns to answer them. Teams that skip this discover in week three that the field they need was never collected, and spend the remaining time apologising for it on a slide.</p>
+  </div>
+
+  <h2 id="requirements">Section 3: Mandatory Technical Requirements</h2>
+
+  <p>Five requirements. All five must be present and visible in the presentation or the repository. Treat this as a checklist and walk it before you submit.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>Data loaded into MongoDB Atlas or Redis — or both.</strong> If you use both, you must justify the split: which data lives where, and what access pattern drove that boundary. "We used both because the course taught both" is not a justification; "the ride records live in Atlas because analysts query arbitrary fields, and the live counters live in Redis because the dashboard polls every five seconds" is.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>At least one non-trivial aggregation pipeline or Redis structure that answers a business question.</strong> Non-trivial means more than a <code>$match</code> and a <code>$group</code> — a multi-stage pipeline with <code>$unwind</code>, <code>$lookup</code>, bucketing, or a computed field, or a Redis design using sorted sets, hashes, bitmaps, or HyperLogLog rather than plain string counters. The question must be stated in business language above the code.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>At least one index with an <code>explain()</code> before-and-after comparison</strong>, <em>or</em> a documented Redis key schema. For MongoDB: show the collection scan, add the index, show the index scan, and quote both <code>totalDocsExamined</code> and <code>executionTimeMillis</code>. For Redis: show the key naming convention, the structure chosen per key, the TTL policy, and the estimated memory footprint.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>A working dashboard.</strong> Atlas Charts (Lectures 15–16) or the Redis + Node pattern from Lecture 18. Both are acceptable and neither scores higher by default — a well-composed Charts dashboard beats a badly laid-out custom one every time.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>The data model decision written down and justified.</strong> One paragraph: what you embedded, what you referenced, and why — or for Redis, how keys are named and what the cardinality of each pattern is. This must appear in the repository and on a slide.</p></div>
+  </div>
+
+  <h3>Evidence Table — What "Present and Visible" Means</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Requirement</th><th>Evidence the Examiner Looks For</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Data loaded</td><td>Document or key count, load script in the repo, and a note on records rejected during cleaning</td></tr>
+      <tr><td>2</td><td>Non-trivial query</td><td>The pipeline or command sequence on a slide, with its business question stated directly above it</td></tr>
+      <tr><td>3</td><td>Index or key schema</td><td>Two <code>explain()</code> outputs side by side, or a key-pattern table with TTLs</td></tr>
+      <tr><td>4</td><td>Dashboard</td><td>A live demo, or a recorded walkthrough if the venue network fails</td></tr>
+      <tr><td>5</td><td>Model justification</td><td>A slide that names the alternative you rejected and the access pattern that decided it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>On the ESR rule from Lecture 14:</strong> if your index serves a query that filters, sorts, and ranges, say so explicitly — Equality fields first, Sort fields second, Range fields last. Naming the rule and showing the compound index that obeys it is one of the cheapest marks available under <em>Technical execution</em>.</p>
+  </div>
+
+  <h2 id="format">Section 4: The Presentation Format</h2>
+
+  <p><strong>12 minutes presenting, 5 minutes Q&amp;A, strictly timed.</strong> A timer runs visibly. At 11:00 you get a one-minute warning. At 12:00 you stop, mid-sentence if necessary, and questions begin. This is not pedantry — it is the single most transferable discipline in the room. Every board paper, every investment committee, and every client readout you will ever give has a hard stop, and the people who overrun are the people who did not decide what mattered.</p>
+
+  <h3>The Suggested Slide Arc</h3>
+  <p>Twelve slides for twelve minutes is the wrong instinct; roughly one minute per slide only works if some slides take ten seconds. The arc below allocates minutes, not slides.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Stage</th><th>Slides</th><th>Minutes</th><th>What It Must Land</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Problem</strong></td><td>1</td><td>~1</td><td>Whose problem, what it costs today, and who would act on an answer</td></tr>
+      <tr><td><strong>Data &amp; why non-relational</strong></td><td>2</td><td>~2</td><td>Source, volume, shape — and the specific property that made a relational table a poor fit</td></tr>
+      <tr><td><strong>Model &amp; architecture</strong></td><td>2</td><td>~2</td><td>Embed vs reference, or key schema; the alternative you rejected; where each store sits</td></tr>
+      <tr><td><strong>Dashboard live demo</strong></td><td>3</td><td>~3.5</td><td>Three questions answered in front of the room, not a tour of every chart you built</td></tr>
+      <tr><td><strong>Findings</strong></td><td>2</td><td>~2</td><td>Two or three numbers you are prepared to defend, with their denominators</td></tr>
+      <tr><td><strong>Recommendation</strong></td><td>1</td><td>~1</td><td>One action, one owner, one expected impact with a number attached</td></tr>
+      <tr><td><strong>Limitations</strong></td><td>1</td><td>~0.5</td><td>What the data cannot tell you — stated before the panel finds it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>That is twelve slides and roughly twelve minutes. The limitations slide is not optional and is not an apology: naming your own weakest assumption before a questioner does is the strongest move available to you, and it reliably converts a hostile question into a collaborative one.</p>
+
+  <div class="callout">
+    <p><strong>On the live demo:</strong> three and a half minutes is enough for three questions, asked aloud and answered on screen. "Which hour has the worst failure rate?" — click, filter, point at the bar, state the number, move on. It is not enough to narrate a dashboard chart by chart, and attempting that is the most common cause of overrun.</p>
+  </div>
+
+  <h3>The Instruction That Decides Your Grade</h3>
+  <div class="callout amber">
+    <p><strong>The grade is not for the technology. It is for the decision the data supports.</strong></p>
+    <p>A simple dashboard with three clear charts and one sharp, quantified recommendation will beat an elaborate one that ends at "here are some charts". Every time. Without exception.</p>
+    <p>Sharding, change streams, a custom React front end, and a vector index earn you nothing on their own. They earn marks only when they are the reason you could answer a question you otherwise could not. If you cannot finish the sentence "we built this <em>so that</em> the business could decide ___", cut it and spend the time on the recommendation instead.</p>
+  </div>
+
+  <div class="callout green">
+    <p><strong>What a sharp recommendation sounds like:</strong> "Among the hours that carry real volume, driver-side failure is worst at 17:00 — 39.92% on 1,062 bookings, against the 18:00 peak's 37.14% on 1,373 — and the leak is worth an estimated ₹13.3 lakh a year. We recommend a ₹40 surge incentive on 16:00–18:00 airport pickups, capped at 300 rides a day. If it converts a third of those cancellations, it recovers about ₹4.4 lakh against ₹1.3 lakh of incentive spend. We would run it for four weeks in one zone first." That is an action, a cost, an expected return, and a test design — in four sentences.</p>
+  </div>
+
+  <h2 id="rubric">Section 5: The Grading Rubric</h2>
+
+  <p>One hundred marks for the project component. The weights are published because you should optimise against them openly — note that <strong>sixty-five of the hundred marks go to framing, modelling, and insight</strong>, and only twenty-five to technical execution.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Criterion</th><th>Marks</th><th>Adequate</th><th>Excellent</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Business problem framing &amp; relevance</strong></td>
+        <td>15</td>
+        <td>A plausible problem is stated in general terms; the dataset is loosely related to it</td>
+        <td>A named decision-maker, a stated cost of the status quo, and a problem narrow enough that the data can settle it. The reader knows what changes if the answer is yes</td>
+      </tr>
+      <tr>
+        <td><strong>Data modelling decisions &amp; justification</strong></td>
+        <td>20</td>
+        <td>A model exists and works; the embed/reference or key choice is described</td>
+        <td>The rejected alternative is named, the access pattern that decided it is stated, and the team can say what would have to change for the other choice to win. Document growth, cardinality, and update frequency are considered</td>
+      </tr>
+      <tr>
+        <td><strong>Technical execution</strong> (queries, indexes, pipelines, key design)</td>
+        <td>25</td>
+        <td>Requirements met: a working pipeline, an index created, a dashboard connected</td>
+        <td>Pipelines are efficient and staged deliberately; the index follows ESR and the <code>explain()</code> comparison is quantified; Redis structures are chosen for their properties, not their familiarity. Nothing is in the stack without a reason</td>
+      </tr>
+      <tr>
+        <td><strong>Dashboard design &amp; clarity</strong></td>
+        <td>20</td>
+        <td>Charts render, are labelled, and relate to the problem</td>
+        <td>Layout follows the eye: headline metric first, then the driver, then the detail. Axes carry units, denominators are visible, chart types suit the data, and a stranger could read it with no narration</td>
+      </tr>
+      <tr>
+        <td><strong>Insight quality &amp; recommendation</strong></td>
+        <td>15</td>
+        <td>Findings are reported accurately; a reasonable suggestion follows</td>
+        <td>The recommendation is specific, owned, costed, and quantified, with a stated expected impact and a way to test it. Limitations are named without being asked</td>
+      </tr>
+      <tr>
+        <td><strong>Presentation &amp; Q&amp;A handling</strong></td>
+        <td>5</td>
+        <td>Finishes near time; questions are answered; all members present something</td>
+        <td>Finishes inside twelve minutes with the demo intact; answers are direct; "we don't know, and here is how we would find out" is used where it is the honest answer</td>
+      </tr>
+      <tr><td><strong>Total</strong></td><td><strong>100</strong></td><td colspan="2">Marked by the examiner; peer scores inform the <em>Presentation &amp; Q&amp;A</em> and <em>Insight</em> rows as corroborating evidence</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>Read the rubric as a budget.</strong> If your team has four spare evenings, two of them belong to the recommendation and the dashboard layout, not to a fourth aggregation pipeline. The marks say so.</p>
+  </div>
+
+  <h2 id="failures">Section 6: Common Failure Modes</h2>
+
+  <p>These seven account for most of the marks lost in previous cohorts. None of them are technical failures — every one is a failure of judgement about what the numbers mean.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Failure Mode</th><th>What It Looks Like in the Room</th><th>The Fix</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>A dashboard with no recommendation</strong></td>
+        <td>Twelve minutes of charts, then "so that's our analysis, thank you". The panel's first question is "and therefore?"</td>
+        <td>Write the recommendation slide <em>first</em>, before building anything. If you cannot draft it, you do not yet have a project</td>
+      </tr>
+      <tr>
+        <td><strong>Vanity metrics</strong></td>
+        <td>Total records, total revenue, a counter ticking up. Impressive, and nobody can act on any of it</td>
+        <td>For every metric ask: if this number doubled tomorrow, who does what differently? If the answer is nobody, cut the chart</td>
+      </tr>
+      <tr>
+        <td><strong>Unlabelled axes and units</strong></td>
+        <td>A bar chart where the y-axis runs to 4,000 and nobody knows whether that is rides, rupees, or minutes</td>
+        <td>Label every axis with a unit. Show the denominator next to every percentage — "17.99% (2,699 of 15,000)"</td>
+      </tr>
+      <tr>
+        <td><strong>Ranking by rate with no volume floor</strong></td>
+        <td>"The worst hour in our data is 03:00 — a 43.48% failure rate." It has <strong>46 bookings</strong>. The team has built a recommendation on twenty failed rides</td>
+        <td>Put a volume floor in the pipeline <em>before</em> you rank, and show the denominator beside every rate</td>
+      </tr>
+      <tr>
+        <td><strong>Causation from correlation</strong></td>
+        <td>"Cancellations are high at 17:00, so drivers avoid the evening peak." The data shows <em>when</em>, never <em>why</em></td>
+        <td>Say "associated with", state the alternative explanations you cannot rule out, and propose the test that would separate them</td>
+      </tr>
+      <tr>
+        <td><strong>A model copied from the course</strong></td>
+        <td>A new dataset forced into the <code>rides</code> document shape, with embedded sub-documents that never get queried</td>
+        <td>Re-derive the model from <em>your</em> access pattern. The Uber model was right for Uber's questions, not for yours</td>
+      </tr>
+      <tr>
+        <td><strong>A live demo with no fallback</strong></td>
+        <td>Venue wi-fi drops, Atlas will not load, four minutes of the slot are spent watching a spinner</td>
+        <td>Screenshots of every demo view in the deck, plus a screen recording. Switch to them within fifteen seconds of trouble and keep talking</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The Small-Sample Trap, Worked Through</h3>
+  <p>The third and fourth rows above are worth one concrete example, because this is the most common way a technically correct pipeline produces a misleading chart. Rank the course dataset's hours by failure rate alone and the table reads:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Hour</th><th>Failure Rate</th><th>Bookings</th><th>What It Actually Is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>03:00</strong></td><td>43.48%</td><td>46</td><td>Noise. Twenty bookings failing instead of eighteen moves this by four points</td>
+      </tr>
+      <tr><td><strong>07:00</strong></td><td>41.60%</td><td>637</td><td>Suggestive, but still thin for a costed intervention</td></tr>
+      <tr><td><strong>16:00</strong></td><td>40.45%</td><td>764</td><td>The shoulder of the real problem</td></tr>
+      <tr><td><strong>17:00</strong></td><td>39.92%</td><td>1,062</td><td><strong>The finding.</strong> The worst rate among hours carrying real volume</td></tr>
+      <tr><td><strong>18:00</strong></td><td>37.14%</td><td>1,373</td><td>The busiest hour of the day — a lower rate on more rides</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Ranked by rate alone, 03:00 wins and sends you chasing forty-six bookings.</strong> The statement that survives scrutiny is narrower and more useful: <em>the worst failure rate among the hours that actually carry volume is 17:00 at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062.</em> That is the sentence a recommendation can be built on, because the hours it names are the hours an intervention would reach.</p>
+    <p>The fix is one stage in the pipeline — a volume floor applied after the grouping and before the sort:</p>
+  </div>
+
+  <pre><code>db.rides.aggregate([
+  { $group: {
+      _id: { $hour: "$booking_datetime" },
+      bookings: { $sum: 1 },
+      failed:   { $sum: { $cond: [{ $ne: ["$status", "Completed"] }, 1, 0] } }
+  }},
+  { $match: { bookings: { $gte: 1000 } } },   // &lt;-- the volume floor
+  { $addFields: { failure_rate: { $divide: ["$failed", "$bookings"] } } },
+  { $sort: { failure_rate: -1 } }
+])</code></pre>
+
+  <p>Choose the floor deliberately and state it on the slide. On this dataset <code>$gte: 1000</code> keeps five hours — 08:00, 09:00, 17:00, 18:00 and 19:00 — and a reviewer can see exactly what you excluded and argue with the threshold. A floor you cannot defend is as bad as no floor; a floor you can is a sign of a team that understands its own numbers.</p>
+
+  <h2 id="runsheet">Section 7: Run Sheet, Peer Review &amp; Demo Hygiene</h2>
+
+  <h3>How the Day Runs</h3>
+  <p>The room is a review panel, not a classroom. The chair keeps time, the examiner marks, and every other student is an evaluator with a form in front of them. Ground rules:</p>
+
+  <ul>
+    <li><strong>Be set up before your slot.</strong> The next team connects and tests their display during the previous team's Q&amp;A. Changeover is not slot time.</li>
+    <li><strong>The timer is visible and absolute.</strong> A warning at 11:00, a stop at 12:00. Content not reached is content not marked.</li>
+    <li><strong>Questions go to the whole team.</strong> The chair may direct a question to a specific member, which is why every member needs to know the model and the headline numbers.</li>
+    <li><strong>No interruptions during the twelve minutes.</strong> Hold questions; write them on the peer form while they are fresh.</li>
+    <li><strong>Peer forms are completed during the presentation</strong>, not reconstructed afterwards. Scores written from memory at the end of the session are noticeably flatter and less useful.</li>
+  </ul>
+
+  <h3>Peer Evaluation</h3>
+  <p>Every student scores every other team on three dimensions, each on a <strong>1–5 scale</strong>:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Dimension</th><th>The Question You Are Answering</th><th>1</th><th>5</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Clarity of the problem</strong></td><td>Did you understand, within the first ninety seconds, whose problem this was and why it mattered?</td><td>Still unclear at the end</td><td>Obvious immediately and never lost</td></tr>
+      <tr><td><strong>Credibility of the analysis</strong></td><td>Do you believe the numbers, and would they survive a sceptical question?</td><td>Unsupported or inconsistent</td><td>Sourced, denominated, and defended under questioning</td></tr>
+      <tr><td><strong>Strength of the recommendation</strong></td><td>Could a manager act on this on Monday?</td><td>Vague or absent</td><td>Specific, costed, owned, and testable</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <p><strong>Peer scores inform the final mark; they do not determine it.</strong> The examiner marks against the rubric. Peer data is used as corroborating evidence — a team the whole room scored 2 on recommendation strength will not be awarded top marks in that row, and a team that visibly carried the room gets the benefit of the doubt on presentation. Scoring your friends uniformly high helps nobody and is visible in the distribution.</p>
+  </div>
+
+  <h3>Demo Hygiene</h3>
+  <p>Four rules, each learned the hard way by a previous cohort.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>Pre-load the data and warm the cluster.</strong> Atlas free-tier clusters idle down. Run your dashboard once, ten minutes before your slot, so the first query of your demo is not the one that pays the cold-start cost.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>Carry screenshots and a recording.</strong> Every view you intend to demo, captured as an image in the deck, plus a two-minute screen recording of the full walkthrough. Rehearse the switch — it should take fifteen seconds and a single sentence: "the network is against us, here is the recorded version".</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>Do not rely on venue wi-fi.</strong> Assume it is congested with forty other devices. Bring a phone hotspot as a tested backup — tested meaning you have actually loaded your dashboard over it, not merely that you own a phone.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Know your own numbers cold.</strong> Every figure on every slide: where it came from, what its denominator is, and what it excludes. "I'd have to check" about your own headline metric is the single most damaging answer in the Q&amp;A.</p></div>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>And one security rule that still applies:</strong> no connection strings, passwords, or API keys on a slide, in a screenshot, or in a public repository. Blur the host in any Atlas screenshot. Credentials shown to a room of forty people are credentials to be rotated that evening.</p>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>The grade is for the decision, not the technology.</strong> Sixty-five of a hundred marks go to framing, modelling, and insight. A simple dashboard with a sharp recommendation beats an elaborate one that stops at charts.</li>
+      <li><strong>Five technical requirements are non-negotiable</strong> — loaded data, a non-trivial query, an index with <code>explain()</code> evidence or a documented key schema, a working dashboard, and a written model justification.</li>
+      <li><strong>Bring your own dataset if you can.</strong> Re-finding the course's 62.29% completion rate proves you can follow instructions; finding something new proves you can do the work.</li>
+      <li><strong>Twelve minutes is a hard stop.</strong> Decide what matters before the room decides for you. Limitations go on your own slide, before a questioner finds them.</li>
+      <li><strong>Most marks are lost to non-technical failures</strong> — no recommendation, vanity metrics, unlabelled axes, a rate ranked with no volume floor, causal overreach, a borrowed model, and a demo with no fallback.</li>
+      <li><strong>Evaluate peers against the same rubric you are judged by.</strong> Clarity of problem, credibility of analysis, strength of recommendation — scored live, on a 1–5 scale, while the presentation is in front of you.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 20 — Project Presentations II &amp; Course Wrap-Up</h3>
+    <p>The remaining teams present in shorter thirteen-minute slots, and the last twenty-five minutes pull the whole module together: which database family answers which business question, the five-question decision framework as the course's most portable asset, and the compute-on-read versus compute-on-write trade that ran from Lecture 14 to Lecture 18. If you are presenting in Lecture 20, note the shorter slot and cut a slide now rather than on the day.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture18/notes.html">← Lecture 18</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture20/notes.html">Lecture 20 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 16 Slides — Dashboard Storytelling &amp; the Recommendation | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 16 · Dashboard Storytelling &amp; the Recommendation</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 17</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 3 · Lecture 16</div>
+    <h1>Dashboard Storytelling &amp; the <span>Recommendation</span></h1>
+    <p class="lead">Four charts and a finding are not an answer. Today we turn them into the one page that goes to the board.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO4</strong></span>
+      <span>📝 <strong>Assignment 3</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Gap</div>
+    <h2>You email last week's dashboard. The reply is one word.</h2>
+    <div class="box amber">
+      <h3>&ldquo;And?&rdquo;</h3>
+    </div>
+    <table>
+      <thead><tr><th>Level</th><th>Sounds like</th><th>Reader does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Description</strong></td><td>&ldquo;37.71% of bookings fail.&rdquo;</td><td>Nods. Nothing changes.</td></tr>
+        <tr><td><strong>Diagnosis</strong></td><td>&ldquo;Most failures are supply-side, peaking at 17:00.&rdquo;</td><td>Finds it interesting. Nothing changes.</td></tr>
+        <tr><td><strong>Recommendation</strong></td><td>&ldquo;Run an incentive at 16:30–17:30 in three hubs. Costs ₹X, recovers ₹Y, we know in three weeks.&rdquo;</td><td><strong>Decides.</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Nobody ever acted on a chart. <strong>If your final slide has no verb, you built evidence for a case nobody made.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Deep-Dive · Step 1</div>
+    <h2>Decomposition gives a number an owner</h2>
+    <table>
+      <thead><tr><th>Outcome</th><th>Bookings</th><th>Share</th><th>Who can fix it</th></tr></thead>
+      <tbody>
+        <tr><td>Cancelled by Driver</td><td>2,698</td><td>17.99%</td><td>Supply team</td></tr>
+        <tr><td>No Driver Found</td><td>1,036</td><td>6.91%</td><td>Supply team</td></tr>
+        <tr><td>Cancelled by Customer</td><td>1,022</td><td>6.81%</td><td>Product</td></tr>
+        <tr><td>Incomplete</td><td>901</td><td>6.01%</td><td>Operations</td></tr>
+      </tbody>
+    </table>
+    <div class="cols">
+      <div class="box green">
+        <div class="big-stat">24.89%</div>
+        <div class="big-stat-lbl">fail on the supply side</div>
+        <p>3,734 bookings — nearly four times the customer-cancellation rate.</p>
+      </div>
+      <div class="box accent">
+        <h3>Why this matters</h3>
+        <p>&ldquo;37.71% fail&rdquo; belongs to nobody. &ldquo;A quarter fail on the supply side&rdquo; names a <strong>department and a budget</strong>.</p>
+      </div>
+    </div>
+    <div class="note-strip">This is the single most valuable move in the whole analysis.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Deep-Dive · Step 2</div>
+    <h2>We ask why, and get an unhelpful answer</h2>
+    <table>
+      <thead><tr><th>Driver reason</th><th>Count</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Customer related issue</td><td>729</td><td>27.02%</td></tr>
+        <tr><td>More than permitted people in there</td><td>666</td><td>24.68%</td></tr>
+        <tr><td>Personal &amp; Car related issues</td><td>652</td><td>24.17%</td></tr>
+        <tr><td>The customer was coughing/sick</td><td>651</td><td>24.13%</td></tr>
+      </tbody>
+    </table>
+    <div class="cols">
+      <div class="box">
+        <h3>Interpretation 1</h3>
+        <p>Causes really are evenly spread — so any single fix addresses at most a quarter. Say so before someone budgets for a silver bullet.</p>
+      </div>
+      <div class="box amber">
+        <h3>Interpretation 2 — more likely</h3>
+        <p><strong>Three of four blame the customer.</strong> Drivers pick from a dropdown under time pressure; the lowest-penalty option wins. This is a <strong>measurement artefact</strong>.</p>
+      </div>
+    </div>
+    <div class="note-strip">&ldquo;Do not design an intervention around these codes until they are validated&rdquo; is a real, defensible recommendation.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Hidden Row</div>
+    <h2>One category is absorbing another's failures</h2>
+    <table>
+      <thead><tr><th>Customer reason</th><th>Count</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Driver is not moving towards pickup location</td><td>211</td><td>20.65%</td></tr>
+        <tr><td>AC is not working</td><td>210</td><td>20.55%</td></tr>
+        <tr><td><strong>Driver asked to cancel</strong></td><td><strong>208</strong></td><td><strong>20.35%</strong></td></tr>
+        <tr><td>Change of plans</td><td>203</td><td>19.86%</td></tr>
+        <tr><td>Wrong Address</td><td>190</td><td>18.59%</td></tr>
+      </tbody>
+    </table>
+    <p>The driver did not want the trip, asked the passenger to cancel so the <strong>penalty fell on them</strong>, and the data now calls it a customer cancellation. Add the 211 &ldquo;not moving towards pickup&rdquo; and ~<strong>419 of 1,022 (41%)</strong> are plausibly driver-initiated.</p>
+    <div class="note-strip">Supply-side share moves from 24.89% toward <strong>27.6%</strong>. Always hunt for the column hiding someone else's failures.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Stress Test · 1 &amp; 2</div>
+    <h2>Attack your own finding first</h2>
+    <div class="cols">
+      <div class="box green">
+        <h3>&ldquo;Is this a small sample?&rdquo;</h3>
+        <p>Fair — it is exactly what catches 03:00 (43.48% on <strong>46 bookings</strong>). But 17:00 carries <strong>1,062</strong>. Stable to a fraction of a point.</p>
+        <p><strong>Survives.</strong></p>
+      </div>
+      <div class="box amber">
+        <h3>&ldquo;Isn't 39.92% ≈ 37.14%?&rdquo;</h3>
+        <p>2.78 points — a <strong>7.5% relative</strong> increase. About 30 extra failed trips in that hour, ~₹7,000 of fares. Material over a year, modest in one hour.</p>
+        <p><strong>Partially survives</strong> — target a window, not a point.</p>
+      </div>
+    </div>
+    <div class="note-strip">Do this in private, before someone does it to you in a board meeting.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Stress Test · 3 &amp; 4</div>
+    <h2>The two attacks most analysts never run</h2>
+    <div class="cols">
+      <div class="box blue">
+        <h3>&ldquo;Composition, not time?&rdquo;</h3>
+        <p>If 17:00 carries more airport trips, and airport trips fail more, the <em>hour</em> is innocent. Segment 17:00 by vehicle type and pickup, compare to the daily mix. Same mix + different rate ⇒ time is the driver.</p>
+      </div>
+      <div class="box blue">
+        <h3>&ldquo;What would make this wrong?&rdquo;</h3>
+        <p>If driver log-ins showed the <em>same</em> active supply at 16:00–17:00 as at 18:00, repositioning collapses. <strong>We do not have that data</strong> — and saying so names exactly which dataset resolves it.</p>
+      </div>
+    </div>
+    <div class="note-strip">This is the check that separates <strong>a finding from a coincidence</strong> — and the rubric rewards it.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Second Data Point</div>
+    <h2>16:00 is what turns a point into a trend</h2>
+    <div class="cols">
+      <div class="box">
+        <div class="big-stat">40.45%</div>
+        <div class="big-stat-lbl">16:00 failure rate</div>
+      </div>
+      <div class="box">
+        <div class="big-stat">39.92%</div>
+        <div class="big-stat-lbl">17:00 failure rate</div>
+      </div>
+      <div class="box amber">
+        <div class="big-stat">37.14%</div>
+        <div class="big-stat-lbl">18:00 — the demand peak</div>
+      </div>
+    </div>
+    <p>One anomalous hour is a curiosity. <strong>Two consecutive elevated hours immediately before the peak is a mechanism:</strong> drivers have not yet repositioned for the evening rush.</p>
+    <div class="note-strip">The intervention is now a <strong>window</strong> — 16:00 to 18:00 — not a single hour.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Geography</div>
+    <h2>Time says when. Location says where.</h2>
+    <table>
+      <thead><tr><th>Pickup location</th><th>Bookings</th><th>Cancelled</th><th>Rate</th></tr></thead>
+      <tbody>
+        <tr><td>Noida Sector 62</td><td>1,209</td><td>405</td><td>33.50%</td></tr>
+        <tr><td>Indira Gandhi International Airport</td><td>1,183</td><td>388</td><td>32.80%</td></tr>
+        <tr><td>New Delhi Railway Station</td><td>1,179</td><td>391</td><td>33.16%</td></tr>
+        <tr><td>Gurgaon Cyber City</td><td>1,178</td><td>368</td><td>31.24%</td></tr>
+        <tr><td>Connaught Place</td><td>1,139</td><td>374</td><td>32.84%</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Five places — an office cluster, an airport, a station, a business district, a city centre — carry <strong>5,888 bookings: 39% of all demand</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Boring Chart</div>
+    <h2>A flat distribution is a finding when it rules something out</h2>
+    <p>Cancellation rates across the top five hubs span <strong>31.24% to 33.50%</strong> — barely two points. There is no catastrophic location.</p>
+    <div class="cols">
+      <div class="box green">
+        <h3>What that proves</h3>
+        <p>The problem is <strong>systemic, not local</strong>. A fix aimed at &ldquo;the bad hub&rdquo; cannot work, because there is no bad hub.</p>
+      </div>
+      <div class="box accent">
+        <h3>What it buys you</h3>
+        <p>The intervention must be <strong>time-based and system-wide</strong>, concentrated where volume already is. The chart that looked boring did real work.</p>
+      </div>
+    </div>
+    <div class="note-strip">Combined: <strong>target 16:00–18:00 at the five hubs carrying 39% of demand.</strong> Defined, costable, measurable.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Structure</div>
+    <h2>Five findings in discovery order are a lab notebook</h2>
+    <table>
+      <thead><tr><th>#</th><th>Beat</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>The stake</strong></td><td>37.71% fail; up to ₹13.3 lakh at risk</td></tr>
+        <tr><td>2</td><td><strong>The narrowing</strong></td><td>~25% fail on the supply side — it has an owner</td></tr>
+        <tr><td>3</td><td><strong>The mechanism</strong></td><td>Peaks at 16:00–17:00, <em>before</em> the demand peak</td></tr>
+        <tr><td>4</td><td><strong>The target</strong></td><td>Five hubs, 39% of demand, uniform rates</td></tr>
+        <tr><td>5</td><td><strong>The action</strong></td><td>One costed recommendation with a date</td></tr>
+        <tr><td>6</td><td><strong>The limits</strong></td><td>What this cannot establish, and what would</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">In the right order they are <strong>an argument</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Layout</div>
+    <h2>Readers scan in a Z</h2>
+    <div class="cols">
+      <div class="box accent">
+        <h3>Top-left — read first</h3>
+        <p>The stake. The status donut frames everything that follows.</p>
+      </div>
+      <div class="box accent">
+        <h3>Top-right — read second</h3>
+        <p>The mechanism. The 16:00–18:00 failure curve.</p>
+      </div>
+      <div class="box">
+        <h3>Bottom-left</h3>
+        <p>Supporting detail — revenue by product, cancellation reasons.</p>
+      </div>
+      <div class="box amber">
+        <h3>Bottom-right — read last, ignored first</h3>
+        <p><strong>Never put your key finding here.</strong></p>
+      </div>
+    </div>
+    <div class="note-strip">Three rules do most of the work: <strong>title states question + population · every axis carries its unit · every number traces to a runnable pipeline.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Deliverable · 1 of 2</div>
+    <h2>Ride Completion — Recommendation</h2>
+    <div class="box">
+      <h3>Finding</h3>
+      <p>5,657 of 15,000 bookings (37.71%) carried no passenger, against ₹22.0 lakh realised. At ₹235.73 average fare that is up to <strong>₹13.3 lakh forgone</strong> — an upper bound, since some customers rebooked.</p>
+    </div>
+    <div class="box">
+      <h3>Diagnosis</h3>
+      <p>At least <strong>24.89%</strong> of all bookings (3,734) fail on the supply side. A further 419 customer cancellations cite &ldquo;driver asked to cancel&rdquo; or &ldquo;driver not moving&rdquo;, pushing the share toward <strong>27.6%</strong>.</p>
+    </div>
+    <div class="box">
+      <h3>Mechanism</h3>
+      <p>Failure peaks at 16:00 (40.45%) and 17:00 (39.92%), <em>above</em> the 18:00 peak's 37.14% despite 18:00 carrying more bookings. Supply lags demand by one to two hours.</p>
+    </div>
+    <div class="note-strip">The memo is the deliverable. <strong>The dashboard is the appendix.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Deliverable · 2 of 2</div>
+    <h2>…and what we will do about it</h2>
+    <div class="box accent">
+      <h3>Recommendation</h3>
+      <p>Pilot a time-boxed driver incentive, <strong>16:00–18:00</strong>, at the five highest-volume hubs (39% of demand). Size it <strong>below ₹235.73</strong> so the economics hold at any recovery rate above break-even.</p>
+    </div>
+    <div class="box green">
+      <h3>Expected impact</h3>
+      <p>Closing the 16:00–17:00 gap to the 18:00 baseline recovers ~60 trips/day across the two hours — roughly <strong>₹14,000 daily, ₹51 lakh annualised</strong>, before incentive cost.</p>
+    </div>
+    <div class="box amber">
+      <h3>How we will know</h3>
+      <p>Compare pilot vs non-pilot hubs over three weeks. <strong>If the gap does not close by at least one percentage point, the explanation is wrong and we stop.</strong></p>
+    </div>
+    <div class="note-strip">Naming the condition under which you abandon your own recommendation is the strongest credibility signal available.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Why It Works</div>
+    <h2>Five properties of a page that gets acted on</h2>
+    <ul>
+      <li><strong>Every number has a denominator.</strong> Not &ldquo;cancellations are high&rdquo; but &ldquo;3,734 of 15,000&rdquo;.</li>
+      <li><strong>The recommendation has a verb and a boundary.</strong> Pilot — these five hubs — this window — below this price.</li>
+      <li><strong>The impact is arithmetic the reader can check.</strong> Show the multiplication; never assert the product.</li>
+      <li><strong>There is a stopping rule.</strong> A date and a threshold at which you walk away.</li>
+      <li><strong>The limitations are specific.</strong> &ldquo;We lack driver log-in data&rdquo; is useful. &ldquo;Further research is needed&rdquo; is filler.</li>
+    </ul>
+    <div class="note-strip">A reader should be able to act, or refuse to act, in <strong>ninety seconds</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Limitations</div>
+    <h2>Under-reporting limits is what destroys trust</h2>
+    <table>
+      <thead><tr><th>Gap</th><th>Weak</th><th>Strong</th></tr></thead>
+      <tbody>
+        <tr><td>No driver supply data</td><td>&ldquo;More data would help.&rdquo;</td><td>&ldquo;Driver log-in timestamps would confirm or kill this in a day.&rdquo;</td></tr>
+        <tr><td>Unreliable reason codes</td><td>&ldquo;Reasons are unclear.&rdquo;</td><td>&ldquo;Three of four blame the customer in near-equal shares — consistent with penalty-avoidance.&rdquo;</td></tr>
+        <tr><td>₹13.3 lakh estimate</td><td>&ldquo;Approximate.&rdquo;</td><td>&ldquo;Upper bound assuming no rebooking. <strong>The conclusion holds even if it is half.</strong>&rdquo;</td></tr>
+        <tr><td>Correlation only</td><td>&ldquo;Causation unproven.&rdquo;</td><td>&ldquo;The pilot <em>is</em> the experiment. That is why we test on a subset.&rdquo;</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Pattern: <strong>name the gap, state what closes it, say whether the conclusion survives.</strong> Handled that way, a limitation <em>adds</em> authority.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Your Turn</div>
+    <h2>Finish the dashboard, then write the page</h2>
+    <div class="cols">
+      <div class="box accent">
+        <h3>In the lab</h3>
+        <p>Add the pickup chart and the customer-reason chart. Verify the 208 yourself. Run the composition check. Re-sequence into the six beats. Retitle every chart as a question.</p>
+      </div>
+      <div class="box green">
+        <h3>Assignment 3</h3>
+        <p>Write your <strong>own</strong> one-page memo. You may well disagree with the incentive pilot — <strong>a well-argued alternative scores higher than a copy.</strong></p>
+      </div>
+    </div>
+    <p>Then hand it to a classmate and ask for the weakest number on the page. Whatever they find is what the marker will find.</p>
+    <div class="note-strip"><strong>Next — Module 4:</strong> this dashboard recomputes on every open. Fine weekly, hopeless for a wall screen refreshing every second. Enter Redis.</div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

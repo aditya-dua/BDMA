@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 15 Slides — Atlas Charts &amp; the Ride-Analytics Problem | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 15 · Atlas Charts &amp; the Ride-Analytics Problem</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 17</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 3 · Lecture 15</div>
+    <h1>Atlas Charts &amp; the <span>Ride-Analytics</span> Problem</h1>
+    <p class="lead">Thirty-seven percent of bookings never carry a passenger. Today we build the dashboard that finds out why.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO4</strong></span>
+      <span>📊 <strong>Atlas Charts</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Brief</div>
+    <h2>Someone has replaced the worksheet</h2>
+    <div class="box amber">
+      <h3>The operations director, after a meeting</h3>
+      <p>&ldquo;Our completion rate is sitting around sixty percent and finance thinks we're leaving money on the table. Nobody can tell me where it's going. You have the data. I have a board meeting on Friday — <strong>give me somewhere to start.</strong>&rdquo;</p>
+    </div>
+    <p>That is a realistic brief in the way that matters most: it names a <strong>symptom</strong>, not a question. Converting it into something answerable is the first job — before you open any tool.</p>
+    <div class="note-strip"><strong>Rule for today:</strong> no chart gets built until its question is written down.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Step 1 · Decompose</div>
+    <h2>&ldquo;Where is the money going?&rdquo; cannot be plotted</h2>
+    <table>
+      <thead><tr><th>Answerable question</th><th>Shape of answer</th><th>Chart</th></tr></thead>
+      <tbody>
+        <tr><td>How do bookings actually end?</td><td>Breakdown of one category</td><td>Donut</td></tr>
+        <tr><td>Which failures are most common?</td><td>Ranked list within a category</td><td>Horizontal bar</td></tr>
+        <tr><td>Does failure depend on time of day?</td><td>Two measures, ordered dimension</td><td>Column + line</td></tr>
+        <tr><td>Which products carry the value?</td><td>Ranked measure by category</td><td>Horizontal bar</td></tr>
+        <tr><td>Where does it happen?</td><td>Ranked list with a rate</td><td>Table</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Each row becomes exactly one chart. <strong>Nothing else gets built.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Step 2 · Size It</div>
+    <h2>How big is the problem?</h2>
+    <div class="cols">
+      <div class="box">
+        <div class="big-stat">37.71%</div>
+        <div class="big-stat-lbl">of bookings fail</div>
+        <p>5,657 of 15,000 never carried a passenger.</p>
+      </div>
+      <div class="box amber">
+        <div class="big-stat">₹13,33,539</div>
+        <div class="big-stat-lbl">estimated lost revenue</div>
+        <p>5,657 failures × ₹235.73 average completed fare.</p>
+      </div>
+      <div class="box green">
+        <div class="big-stat">₹22,02,449</div>
+        <div class="big-stat-lbl">revenue realised</div>
+        <p>What the operation actually earned in 2024.</p>
+      </div>
+    </div>
+    <div class="note-strip">Establish magnitude in the <strong>first five minutes</strong>. It decides how much effort the problem deserves.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Intellectual Honesty</div>
+    <h2>Attack your own number before the CFO does</h2>
+    <p>₹13,33,539 assumes every failed booking would have completed at the average fare. <strong>It would not have.</strong></p>
+    <div class="cols">
+      <div class="box amber">
+        <h3>Why it is an upper bound</h3>
+        <p>Some customers rebooked within minutes and are already inside the 9,343 completed. Some trips would have been short and cheap.</p>
+      </div>
+      <div class="box green">
+        <h3>Why it still works</h3>
+        <p>Halve it and you have ₹6.7 lakh against ₹22 lakh realised. The problem survives the most hostile assumption you can make.</p>
+      </div>
+    </div>
+    <div class="note-strip">A <strong>defended upper bound</strong> survives questioning. An undefended point estimate does not.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Tool Choice</div>
+    <h2>You could do this in Excel. What do you lose?</h2>
+    <table>
+      <thead><tr><th>Dimension</th><th>CSV → Excel</th><th>Atlas Charts</th></tr></thead>
+      <tbody>
+        <tr><td>Freshness</td><td>Frozen at export</td><td>Queries live data on load</td></tr>
+        <tr><td>Nested fields</td><td>Flatten <code>route.pickup</code> by hand</td><td>Dot notation works natively</td></tr>
+        <tr><td>Size ceiling</td><td>~1M rows, painful well before</td><td>Aggregates server-side</td></tr>
+        <tr><td>Reproducibility</td><td>Steps live in one person's memory</td><td>The chart <em>is</em> the spec</td></tr>
+        <tr><td>Exploring once</td><td><strong>Genuinely better</strong></td><td>More structured</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Excel for exploring once. Charts for anything that must <strong>still be true next month</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Positioning</div>
+    <h2>Charts is not competing with Tableau</h2>
+    <div class="cols">
+      <div class="box blue">
+        <h3>Tableau / Power BI</h3>
+        <p>Richer visual grammar, modelling layer, enterprise governance. Needs a connector, an extract schedule, a licence per seat, and an owner for all three.</p>
+      </div>
+      <div class="box accent">
+        <h3>Atlas Charts</h3>
+        <p>Included with the cluster. No connector, no extract, nested documents native. Weaker at blending many sources.</p>
+      </div>
+      <div class="box">
+        <h3>Hand-built</h3>
+        <p>Total control, no licence — and you own every bug forever.</p>
+      </div>
+    </div>
+    <div class="note-strip">Charts wins on <strong>one</strong> axis: it is already connected to your data. Say which situation you are in; the tool follows.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Mental Model · 1 of 3</div>
+    <h2>The data source can carry a pipeline</h2>
+    <p>This is the feature people miss. Everything from Lecture 14 is available <em>inside</em> the data source:</p>
+    <pre><code>[
+  { $addFields: {
+      hour:   { $toInt: { $substr: ["$booked_at", 11, 2] } },
+      failed: { $cond: [{ $eq: ["$status", "Completed"] }, 0, 1] }
+  } }
+]</code></pre>
+    <p>Two lines — and <code>hour</code> and <code>failed</code> now exist as fields for every chart built on this source.</p>
+    <div class="note-strip"><code>booked_at</code> is a <strong>string</strong> here, so we slice characters 11–12 rather than calling <code>$hour</code>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Mental Model · 2 of 3</div>
+    <h2>Encoding channels are aggregation stages</h2>
+    <table>
+      <thead><tr><th>Channel</th><th>Visual role</th><th>You already know it as</th></tr></thead>
+      <tbody>
+        <tr><td><strong>X / Category</strong></td><td>What the bars are</td><td><code>$group._id</code></td></tr>
+        <tr><td><strong>Y / Value</strong></td><td>How tall each one is</td><td><code>$sum</code> / <code>$avg</code> / <code>$count</code></td></tr>
+        <tr><td><strong>Series / Colour</strong></td><td>Splits into sub-bars</td><td>A compound <code>_id</code></td></tr>
+        <tr><td><strong>Filter</strong></td><td>Which documents count</td><td><code>$match</code>, placed first</td></tr>
+        <tr><td><strong>Sort &amp; limit</strong></td><td>Ranking, top-N</td><td><code>$sort</code> then <code>$limit</code></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Chart shows a number you did not expect? <strong>Write the pipeline it implies and run it in <code>mongosh</code>.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Mental Model · 3 of 3</div>
+    <h2>Filters are where dashboards learn to lie</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>Three levels</h3>
+        <p><strong>Source</strong> — applies everywhere, invisible.<br /><strong>Chart</strong> — that chart only.<br /><strong>Dashboard</strong> — interactive, viewer-controlled.</p>
+      </div>
+      <div class="box amber">
+        <h3>The failure</h3>
+        <p>A chart titled &ldquo;Average Booking Value&rdquo; that quietly filters to <code>status: "Completed"</code> is not wrong — ₹235.73 is correct for completed rides. But a reader assuming all 15,000 has been misled.</p>
+      </div>
+    </div>
+    <div class="note-strip">Put the filter in the title: <strong>&ldquo;Average Booking Value (Completed Rides Only)&rdquo;</strong>. The rubric checks this.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Chart 1 · Build Along</div>
+    <h2>How do bookings actually end?</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>Configuration</h3>
+        <p><strong>Donut.</strong> Label: <code>status</code>. Arc: <code>COUNT</code>.</p>
+        <p>One of the few cases where a donut beats a bar — the question is &ldquo;what share?&rdquo;, not &ldquo;which is bigger?&rdquo;</p>
+      </div>
+      <div class="box">
+        <table>
+          <tbody>
+            <tr><td>Completed</td><td><strong>9,343</strong></td><td>62.29%</td></tr>
+            <tr><td>Cancelled by Driver</td><td>2,698</td><td>17.99%</td></tr>
+            <tr><td>No Driver Found</td><td>1,036</td><td>6.91%</td></tr>
+            <tr><td>Cancelled by Customer</td><td>1,022</td><td>6.81%</td></tr>
+            <tr><td>Incomplete</td><td>901</td><td>6.01%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note-strip">Driver cancels (17.99%) + no driver found (6.91%) ≈ <strong>25% of all bookings fail on the supply side.</strong> That reframes the whole brief.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Chart 2 · Build Along</div>
+    <h2>Count and value rank differently</h2>
+    <table>
+      <thead><tr><th>Vehicle type</th><th>Revenue</th><th>Bookings</th><th>Avg fare</th><th>Completion</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Premier Sedan</strong></td><td><strong>₹5,36,855</strong></td><td>1,954</td><td>₹442.22</td><td>62.13%</td></tr>
+        <tr><td>Go Sedan</td><td>₹4,91,473</td><td><strong>2,854</strong></td><td>₹278.77</td><td>61.77%</td></tr>
+        <tr><td>Uber XL</td><td>₹4,31,927</td><td>1,231</td><td>₹558.77</td><td>62.79%</td></tr>
+      </tbody>
+    </table>
+    <p>Go Sedan has the <strong>most bookings</strong>. Premier Sedan earns the <strong>most revenue</strong>. A failed Uber XL costs ₹558.77 against a Go Sedan's ₹278.77.</p>
+    <div class="note-strip">Fixing cancellations for one product? Start where each failure is <strong>most expensive</strong>, not most numerous.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Chart 3 · The Finding</div>
+    <h2>Volume is not risk</h2>
+    <table>
+      <thead><tr><th>Hour</th><th>Bookings</th><th>Failure rate</th></tr></thead>
+      <tbody>
+        <tr><td>18:00 — busiest hour</td><td>1,373</td><td>37.14%</td></tr>
+        <tr><td>19:00</td><td>1,246</td><td>35.96%</td></tr>
+        <tr><td>09:00</td><td>1,172</td><td>36.18%</td></tr>
+        <tr><td>08:00</td><td>1,076</td><td>36.71%</td></tr>
+        <tr><td><strong>17:00</strong></td><td><strong>1,062</strong></td><td><strong>39.92%</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Every instinct says throw resources at the 18:00 peak. But <strong>17:00 — one hour earlier — fails more often.</strong> Supply is thinnest just <em>before</em> demand peaks: drivers have not yet repositioned.</p>
+    <div class="note-strip">A dashboard plotting only volume would have aimed the fix at <strong>the wrong hour</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Chart 4 · An Awkward Result</div>
+    <h2>When there is no dominant cause</h2>
+    <table>
+      <thead><tr><th>Driver cancellation reason</th><th>Count</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Customer related issue</td><td>729</td><td>27.02%</td></tr>
+        <tr><td>More than permitted people in there</td><td>666</td><td>24.68%</td></tr>
+        <tr><td>Personal &amp; Car related issues</td><td>652</td><td>24.17%</td></tr>
+        <tr><td>The customer was coughing/sick</td><td>651</td><td>24.13%</td></tr>
+      </tbody>
+    </table>
+    <p>Four reasons, all between 24% and 27%. The temptation is to pick the top bar and call it the answer. <strong>A 27% leader among four near-equal options is not a finding — it is a flat distribution.</strong></p>
+    <div class="note-strip">&ldquo;The data cannot answer this; here is what we'd need to collect&rdquo; is a <strong>legitimate recommendation</strong>. We develop it in L16.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Discipline</div>
+    <h2>Four chart choices that are almost always wrong</h2>
+    <div class="cols">
+      <div class="box amber">
+        <h3>Pie with twelve slices</h3>
+        <p>Nobody can rank slices 7 through 12. Use a sorted bar.</p>
+      </div>
+      <div class="box amber">
+        <h3>3D anything</h3>
+        <p>Perspective distorts exactly the lengths the reader is comparing. Never correct in this course.</p>
+      </div>
+      <div class="box amber">
+        <h3>Line over unordered categories</h3>
+        <p>A line from &ldquo;Go Sedan&rdquo; to &ldquo;Uber XL&rdquo; implies a progression that does not exist.</p>
+      </div>
+      <div class="box amber">
+        <h3>Dual axis tuned to cross</h3>
+        <p>Legitimate for different units. Scaling until the lines intersect dramatically is rhetoric, and it gets caught.</p>
+      </div>
+    </div>
+    <div class="note-strip">Chart type is not aesthetics. Each one <strong>encodes a specific relationship</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Traps</div>
+    <h2>Three ways to produce confident nonsense</h2>
+    <div class="cols">
+      <div class="box amber">
+        <h3>1 · The small-sample rate</h3>
+        <p>Sort hourly failure by rate and the top is <strong>03:00 at 43.48%</strong> — on <strong>46 bookings</strong>. One more cancellation moves it two points. Fix: <code>{ $match: { bookings: { $gte: 1000 } } }</code> after <code>$group</code>.</p>
+      </div>
+      <div class="box amber">
+        <h3>2 · Averaging over absent fields</h3>
+        <p><code>booking_value</code> is <strong>missing</strong> on failed bookings, and <code>$avg</code> skips it silently. Filter to the population you mean, then name it in the title.</p>
+      </div>
+      <div class="box amber">
+        <h3>3 · The truncated axis</h3>
+        <p>Completion by vehicle spans 61.77%–62.79%. Plot 61–63 and the bars look dramatic. Start at zero — the real finding is that it <strong>barely varies</strong>.</p>
+      </div>
+    </div>
+    <div class="note-strip">All three are <strong>live in this dataset right now</strong>. They produce charts defensible line by line and wrong as a whole.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Your Turn</div>
+    <h2>Build it, then check it against the shell</h2>
+    <div class="cols">
+      <div class="box accent">
+        <h3>The lab</h3>
+        <p>Add <code>bdma.rides</code> as a source, attach the <code>$addFields</code> pipeline, create <strong>Ride Operations — Failure Analysis</strong>, and build all four charts.</p>
+      </div>
+      <div class="box green">
+        <h3>The check</h3>
+        <p>After each chart, verify the number against your Lecture 14 pipeline. The dataset is <strong>seeded</strong> — there is no &ldquo;close enough&rdquo;. A mismatch is a filter you forgot.</p>
+      </div>
+    </div>
+    <p>Title every chart with its question and population. Arrange for reading order: the status donut goes top-left, because it frames everything else.</p>
+    <div class="note-strip"><strong>Next:</strong> L16 — turning four charts and a finding into the one-page recommendation due Friday.</div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

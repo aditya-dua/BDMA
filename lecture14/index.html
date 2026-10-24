@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 14 Slides — Indexing &amp; the Aggregation Framework | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 14 · Indexing &amp; the Aggregation Framework</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 19</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 2 · Lecture 14</div>
+    <h1>Indexing &amp; the <span>Aggregation</span> Framework</h1>
+    <p class="lead">Making queries fast — then turning 15,000 raw bookings into the handful of numbers a management meeting actually needs.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO3</strong></span>
+      <span>📦 <strong>MongoDB 201</strong></span>
+      <span>🗂 <strong>bdma.rides · 15,000 docs</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Where We Are</div>
+    <h2>Two halves, one collection</h2>
+    <p>Lecture 13 gave you <code>find()</code> and the query operators. Every query you wrote worked. None of them were fast — the collection was simply small enough to hide it.</p>
+    <div class="cols">
+      <div class="box accent">
+        <h3>Half 1 · Indexing (~40 min)</h3>
+        <p>Why an unindexed query is <code>O(n)</code>, how a B-tree fixes it, the <strong>ESR rule</strong> for compound indexes, and how to read <code>explain()</code> — plus why more indexes is <em>not</em> better.</p>
+      </div>
+      <div class="box green">
+        <h3>Half 2 · Aggregation (~40 min)</h3>
+        <p>Pipelines as a conveyor belt of stages. Seven real business questions answered against <code>bdma.rides</code>, and the output materialised for Lecture 15's dashboard.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>The through-line:</strong> indexing makes retrieval fast; aggregation turns retrieval into an <em>answer</em>. A dashboard needs both.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Problem &amp; The Fix</div>
+    <h2>A scan reads everything. A B-tree does not.</h2>
+    <p>With no usable index, <code>db.rides.find({ "route.pickup": "Connaught Place" })</code> reads all 15,000 documents to return ~1,139. Plan stage: <code>COLLSCAN</code> — and it is <code>O(n)</code>, with no early exit.</p>
+    <table>
+      <thead><tr><th>Collection size</th><th>Docs read per query</th><th>Response</th><th>Business reality</th></tr></thead>
+      <tbody>
+        <tr><td>15,000 <em>(today)</em></td><td>15,000</td><td>~30 ms</td><td>Feels instant — the problem is invisible</td></tr>
+        <tr><td>1,500,000</td><td>1,500,000</td><td>~3 s</td><td>A dashboard tile that visibly stalls</td></tr>
+        <tr><td>15,000,000</td><td>15,000,000</td><td>~30 s</td><td>Timeouts. The report is abandoned, not slow.</td></tr>
+      </tbody>
+    </table>
+    <div class="cols">
+      <div class="box amber">
+        <h3>COLLSCAN — O(n)</h3>
+        <p>Read the whole book to find one sentence. Twice the data, twice the work — and every document dragged through RAM evicts useful data from cache, slowing unrelated queries too.</p>
+      </div>
+      <div class="box green">
+        <h3>IXSCAN — O(log n)</h3>
+        <p>A sorted B-tree of values plus pointers: read the index page, turn to page 412, read one sentence. Finding one doc among <strong>15 million</strong> costs about <strong>twice</strong> as much as among 15 thousand — not a thousand times.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Translation:</strong> a 400 ms query becomes ~12 s at 30× the data. That is not degradation — it is the difference between a report people open every morning and one they stop opening.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Syntax</div>
+    <h2><code>createIndex()</code> — and when direction matters</h2>
+<pre><code>db.rides.createIndex({ status: 1 })                 // 1 = ascending
+db.rides.createIndex({ booking_value: -1 })         // -1 = descending
+db.rides.createIndex({ "route.pickup": 1 }, { name: "pickup_idx" })
+
+db.rides.getIndexes()
+db.rides.dropIndex("pickup_idx")</code></pre>
+    <p>For a <strong>single-field</strong> index, direction is almost irrelevant — a B-tree walks either way. It becomes decisive for a <strong>compound</strong> sort, which an index serves only if the sort matches it exactly, or is its exact mirror.</p>
+<pre><code>db.rides.createIndex({ vehicle_type: 1, booking_value: -1 })
+
+.sort({ vehicle_type:  1, booking_value: -1 })   // ✅ exact match
+.sort({ vehicle_type: -1, booking_value:  1 })   // ✅ exact mirror
+.sort({ vehicle_type:  1, booking_value:  1 })   // ❌ in-memory SORT</code></pre>
+    <div class="note-strip"><strong>Why the ❌ hurts:</strong> in-memory sorts have a hard <strong>100 MB</strong> limit. Past it the query does not slow down — it <em>fails</em>. A report that passed testing can break purely because the data grew.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Toolkit</div>
+    <h2>Five index types worth knowing by name</h2>
+    <table>
+      <thead><tr><th>Type</th><th>Created with</th><th>For</th><th>On <code>rides</code></th></tr></thead>
+      <tbody>
+        <tr><td><strong>Single-field</strong></td><td><code>{ status: 1 }</code></td><td>Filter or sort on one field</td><td>Every "completed only" query</td></tr>
+        <tr><td><strong>Compound</strong></td><td><code>{ status: 1, date: 1 }</code></td><td>Several fields at once; serves prefixes too</td><td>"Completed rides in March, newest first"</td></tr>
+        <tr><td><strong>Multikey</strong></td><td><code>{ tags: 1 }</code></td><td>Automatic on arrays — one entry per element</td><td>A <code>surge_flags</code> array</td></tr>
+        <tr><td><strong>Text</strong></td><td><code>{ "cancellation.reason": "text" }</code></td><td>Word search with stemming; one per collection</td><td>Keyword search of cancel reasons</td></tr>
+        <tr><td><strong>TTL</strong></td><td><code>{ expireAfterSeconds: 86400 }</code></td><td>Auto-delete after an interval; needs a real <code>Date</code></td><td>Expiring driver-location pings</td></tr>
+      </tbody>
+    </table>
+    <p>Also: <strong>unique</strong> (natural for <code>booking_id</code>), <strong>partial</strong> — ideal here, since <code>booking_value</code> is absent on ~5,000 cancelled bookings — and <strong>2dsphere</strong> for "drivers within 3 km".</p>
+    <div class="note-strip"><strong>TTL as policy:</strong> "we do not keep raw location data beyond 30 days" becomes one line of config, not a cron job nobody maintains.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Compound Indexes</div>
+    <h2>The prefix rule, then ESR</h2>
+    <p>Given <code>{ status: 1, vehicle_type: 1, booking_value: -1 }</code>, the index serves any query using a <strong>left prefix</strong> of its fields:</p>
+    <table>
+      <thead><tr><th>Query filters on</th><th>Usable?</th></tr></thead>
+      <tbody>
+        <tr><td><code>status</code> &nbsp;·&nbsp; <code>status</code> + <code>vehicle_type</code> &nbsp;·&nbsp; all three</td><td>✅ Yes</td></tr>
+        <tr><td><code>vehicle_type</code> alone &nbsp;·&nbsp; <code>booking_value</code> alone</td><td>❌ No — skips a leading field</td></tr>
+      </tbody>
+    </table>
+    <div class="box accent">
+      <h3>The ESR rule — order compound fields Equality → Sort → Range</h3>
+      <p><strong>E</strong> exact matches first · <strong>S</strong> sort fields next · <strong>R</strong> range operators (<code>$gt</code>, <code>$lt</code>, <code>$in</code> over a span) last.</p>
+      <p style="margin-top:.5rem"><strong>Why:</strong> equality narrows the B-tree to one contiguous block, inside which entries are still ordered by the next field — so the sort is free. A range selects a <em>span</em>, so anything after it is no longer in one sorted run and must be re-sorted in memory.</p>
+    </div>
+    <div class="note-strip">One well-ordered compound index often replaces three single-field ones: fewer indexes, less RAM, cheaper writes.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">ESR · Worked on <code>rides</code></div>
+    <h2>"Completed Go Sedan rides over ₹500, newest first"</h2>
+<pre><code>db.rides.find({
+  status: "Completed",          // E — equality
+  vehicle_type: "Go Sedan",     // E — equality
+  booking_value: { $gt: 500 }   // R — range
+}).sort({ date: -1 })           // S — sort
+
+db.rides.createIndex({ status: 1, vehicle_type: 1, date: -1, booking_value: 1 })
+//                     └── E ──┘  └──── E ─────┘  └─ S ─┘  └───── R ─────┘</code></pre>
+    <table>
+      <thead><tr><th>Field order</th><th>What happens</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><code>status, vehicle_type, date, booking_value</code></td><td>Equality narrows the block; it is already ordered by <code>date</code>; range applied last</td><td><strong>ESR ✅</strong></td></tr>
+        <tr><td><code>status, vehicle_type, booking_value, date</code></td><td>Range fans the scan, so <code>date</code> loses its order → an in-memory <code>SORT</code> appears</td><td>Slow</td></tr>
+        <tr><td><code>booking_value, status, vehicle_type, date</code></td><td>Leads with a range: the scan starts broad and stays broad</td><td>Worst</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>Watch carefully:</strong> all three produce <code>IXSCAN</code>. "The index is being used" is <em>not</em> evidence the index is good. Only ESR gets docs-examined close to docs-returned.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Diagnosis</div>
+    <h2><code>explain("executionStats")</code> — four numbers</h2>
+<pre><code>db.rides.find({ "route.pickup": "Connaught Place" })
+        .explain("executionStats")</code></pre>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th><th>What you want</th></tr></thead>
+      <tbody>
+        <tr><td><code>stage</code></td><td><code>COLLSCAN</code> / <code>IXSCAN</code> / <code>FETCH</code> / <code>SORT</code></td><td><code>IXSCAN</code>. A <code>SORT</code> stage means an in-memory sort.</td></tr>
+        <tr><td><code>nReturned</code></td><td>Documents actually returned</td><td>Your denominator — the useful work</td></tr>
+        <tr><td><code>totalDocsExamined</code></td><td>Documents the engine had to read</td><td>As close to <code>nReturned</code> as possible</td></tr>
+        <tr><td><code>executionTimeMillis</code></td><td>Wall-clock time</td><td>The headline — and the least trustworthy number</td></tr>
+      </tbody>
+    </table>
+    <div class="box accent">
+      <h3>The metric is a ratio, not a time</h3>
+      <p><code>totalDocsExamined ÷ nReturned</code>. <strong>1:1 is perfect.</strong> 10:1 is tolerable. 1,000:1 means the database did a thousand times more work than the answer needed — and it scales exactly that badly.</p>
+    </div>
+    <div class="note-strip">Prefer the ratio because it is hardware- and cache-independent. <strong>12 ms on a warm laptop cache with a 1,000:1 ratio is an incident waiting for a cold start.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Before · After · Covered</div>
+    <h2>Three tiers of query efficiency</h2>
+    <div class="cols">
+      <div class="box amber">
+        <h3>❌ Scan — 13:1</h3>
+<pre><code>stage: "COLLSCAN"
+nReturned: 1139
+totalDocsExamined: 15000
+executionTimeMillis: 28</code></pre>
+      </div>
+      <div class="box green">
+        <h3>✅ Indexed — 1:1</h3>
+<pre><code>// createIndex({"route.pickup":1})
+stage: "IXSCAN"
+nReturned: 1139
+totalDocsExamined: 1139
+executionTimeMillis: 3</code></pre>
+      </div>
+      <div class="box accent">
+        <h3>🏆 Covered — 0 docs</h3>
+<pre><code>stage: "PROJECTION_COVERED"
+nReturned: 1763
+totalDocsExamined: 0</code></pre>
+      </div>
+    </div>
+    <p>A <strong>covered query</strong> is answered from the index alone — every filtered <em>and</em> returned field lives in the index, so the documents are never touched. Note that <code>_id</code> must be explicitly excluded:</p>
+<pre><code>db.rides.createIndex({ status: 1, vehicle_type: 1, booking_value: 1 })
+db.rides.find(
+  { status: "Completed", vehicle_type: "Go Sedan" },
+  { _id: 0, vehicle_type: 1, booking_value: 1 }
+)</code></pre>
+    <div class="note-strip"><strong>Why engineer for it:</strong> indexes are far smaller than documents, so they are far likelier to be resident in RAM. Covered queries are the ideal shape for exactly the few-field, high-frequency reads dashboards make.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Other Side of the Ledger</div>
+    <h2>Indexes are not free — more is not better</h2>
+    <div class="cols">
+      <div class="box amber">
+        <h3>1 · Every write pays</h3>
+        <p>An insert writes the document <em>plus one entry per index</em>. Twelve indexes ≈ thirteen units of write work. The analytics team's indexes are paid for, permanently, by the booking ingest path.</p>
+      </div>
+      <div class="box amber">
+        <h3>2 · RAM is the whole game</h3>
+        <p>Your <strong>working set</strong> is the data + indexes queries touch regularly. Fits in RAM → fast. Doesn't → disk reads, often <strong>50× slower</strong>. Indexes compete with documents for that same cache.</p>
+      </div>
+      <div class="box amber">
+        <h3>3 · Unused indexes are pure cost</h3>
+        <p>They still slow writes and still occupy RAM, while contributing nothing.</p>
+<pre><code>db.rides.aggregate([{ $indexStats: {} }])
+// accesses.ops: 0 → drop candidate</code></pre>
+      </div>
+    </div>
+    <p><strong>Atlas Performance Advisor</strong> (Clusters → Performance Advisor) profiles real traffic and ranks index recommendations by expected impact, flagging unused and redundant ones too.</p>
+    <div class="note-strip"><strong>Use it, don't outsource judgement to it.</strong> It optimises each slow query in isolation — it knows nothing about your write volume or RAM budget. Accept a recommendation when you can explain it in <strong>ESR</strong> terms.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Half 2 · The Mental Model</div>
+    <h2>A pipeline is a conveyor belt of stages</h2>
+<pre><code>db.rides.aggregate([
+  { $match: { status: "Completed" } },                  // 15,000 → 9,343
+  { $group: { _id: "$vehicle_type",
+              revenue: { $sum: "$booking_value" } } },  //  9,343 → 7
+  { $sort:  { revenue: -1 } },                          //      7 → 7, ordered
+  { $limit: 3 }                                         //      7 → 3
+])
+// → Premier Sedan ₹5,36,855 · Go Sedan ₹4,91,473 · Uber XL ₹4,31,927</code></pre>
+    <table>
+      <thead><tr><th>SQL</th><th>Stage</th><th>SQL</th><th>Stage</th></tr></thead>
+      <tbody>
+        <tr><td><code>WHERE</code></td><td><code>$match</code></td><td><code>ORDER BY</code></td><td><code>$sort</code></td></tr>
+        <tr><td><code>GROUP BY</code></td><td><code>$group</code> <em>(key is always <code>_id</code>)</em></td><td><code>LIMIT</code> / <code>OFFSET</code></td><td><code>$limit</code> / <code>$skip</code></td></tr>
+        <tr><td><code>HAVING</code></td><td><code>$match</code> <em>after</em> <code>$group</code></td><td><code>LEFT OUTER JOIN</code></td><td><code>$lookup</code></td></tr>
+        <tr><td><code>SELECT col, expr</code></td><td><code>$project</code> / <code>$addFields</code></td><td><code>COUNT(*)</code></td><td><code>$count</code> or <code>{ $sum: 1 }</code></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Read a pipeline top to bottom as an English sentence. <code>HAVING</code> and <code>WHERE</code> are the <em>same stage</em> — only the position differs, and the position <em>is</em> the meaning.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Vocabulary</div>
+    <h2>The stages and accumulators you need</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>Stages</h3>
+        <table>
+          <tbody>
+            <tr><td><code>$match</code></td><td>Filter the stream</td></tr>
+            <tr><td><code>$group</code></td><td>Collapse to one doc per key</td></tr>
+            <tr><td><code>$project</code></td><td>Choose / compute output fields</td></tr>
+            <tr><td><code>$addFields</code> / <code>$set</code></td><td>Add fields, keep the rest</td></tr>
+            <tr><td><code>$unwind</code></td><td>Array of <em>n</em> → <em>n</em> documents</td></tr>
+            <tr><td><code>$lookup</code></td><td>Left outer join → array</td></tr>
+            <tr><td><code>$count</code> / <code>$bucket</code></td><td>Count · numeric histogram</td></tr>
+            <tr><td><code>$facet</code></td><td>Many sub-pipelines, one pass</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="box">
+        <h3>Accumulators (inside <code>$group</code>)</h3>
+        <table>
+          <tbody>
+            <tr><td><code>$sum</code></td><td>Total; <code>$sum: 1</code> counts</td></tr>
+            <tr><td><code>$avg</code></td><td>Mean — <em>ignores missing</em></td></tr>
+            <tr><td><code>$min</code> / <code>$max</code></td><td>Extremes</td></tr>
+            <tr><td><code>$push</code></td><td>All values, duplicates kept</td></tr>
+            <tr><td><code>$addToSet</code></td><td>Distinct values only</td></tr>
+            <tr><td><code>$first</code> / <code>$last</code></td><td><em>Sort first, or it is arbitrary</em></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note-strip"><strong>The <code>$avg</code> trap:</strong> it skips missing fields rather than treating them as zero. So <code>$avg: "$booking_value"</code> over all 15,000 rides silently returns the average <em>completed</em> fare (₹235.73). Make the population explicit with <code>$match</code>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Golden Rule</div>
+    <h2><code>$match</code> and <code>$limit</code> as early as possible</h2>
+    <div class="cols">
+      <div class="box amber">
+        <h3>❌ Late filter</h3>
+<pre><code>db.rides.aggregate([
+  { $group: { _id: "$vehicle_type",
+      revenue: { $sum: "$booking_value" }}},
+  { $match: { _id: "Go Sedan" } }
+])
+// groups all 15,000, discards most</code></pre>
+      </div>
+      <div class="box green">
+        <h3>✅ Early filter</h3>
+<pre><code>db.rides.aggregate([
+  { $match: { vehicle_type: "Go Sedan" } },
+  { $group: { _id: "$vehicle_type",
+      revenue: { $sum: "$booking_value" }}}
+])
+// groups 2,854 — a fifth of the work</code></pre>
+      </div>
+    </div>
+    <p>Fewer documents for every later stage is merely arithmetic. <strong>The decisive reason is different:</strong> only a <code>$match</code> in the <em>first</em> position can use an index. Once any stage has transformed the stream, the documents are no longer the indexed documents on disk — every later <code>$match</code> is an in-memory filter over intermediate results.</p>
+    <p>Same logic for <code>$sort</code>: leading <code>$sort</code> → index-served. After <code>$group</code> → in-memory, against a hard 100 MB stage limit. <code>$sort</code> + <code>$limit</code> adjacent gets a special top-<em>n</em> optimisation.</p>
+    <div class="note-strip">Verify, don't assume: <code>db.rides.aggregate([…]).explain("executionStats")</code> — check the <strong>first stage</strong>. <code>IXSCAN</code> is the goal, <code>COLLSCAN</code> is the warning.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Questions 1 &amp; 6</div>
+    <h2>Two findings that are usefully negative</h2>
+<pre><code>// Q1 — completion rate by vehicle type. $cond inside $sum gives you
+// numerator and denominator in a single pass over the data.
+db.rides.aggregate([
+  { $group: {
+      _id: "$vehicle_type",
+      total:     { $sum: 1 },
+      completed: { $sum: { $cond: [{ $eq: ["$status", "Completed"] }, 1, 0] } },
+      revenue:   { $sum: "$booking_value" }
+  }},
+  { $addFields: { completion_rate_pct: { $round: [
+      { $multiply: [{ $divide: ["$completed", "$total"] }, 100] }, 2 ]}}},
+  { $sort: { revenue: -1 } }
+])</code></pre>
+    <table>
+      <thead><tr><th>Vehicle</th><th>Bookings</th><th>Completion</th><th>Revenue</th><th>Avg fare</th></tr></thead>
+      <tbody>
+        <tr><td>Premier Sedan</td><td>1,954</td><td>62.13%</td><td>₹5,36,855</td><td>₹442.22</td></tr>
+        <tr><td>Go Sedan</td><td>2,854</td><td>61.77%</td><td>₹4,91,473</td><td>₹278.77</td></tr>
+        <tr><td>Uber XL</td><td>1,231</td><td>62.79%</td><td>₹4,31,927</td><td>₹558.77</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Q6</strong> — average driver rating by vehicle, completed rides only (<code>$match</code> on <code>status</code> + <code>"ratings.driver": { $exists: true }</code>) — lands every type between <strong>4.39 and 4.42</strong>, against a fleet average of 4.41.</p>
+    <div class="note-strip"><strong>Report the dimension that discriminates — and say which one doesn't.</strong> Completion sits within a point of 62% everywhere and ratings within 0.03, so neither explains the 37.71% failure rate. Revenue varies more than tenfold. That is where to look.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Questions 2 &amp; 3</div>
+    <h2>Dates are strings here — and that is the lesson</h2>
+    <p><code>booked_at</code> (<code>"2024-03-14T18:22:07Z"</code>) and <code>date</code> (<code>"2024-03-14"</code>) are <strong>strings</strong>, not BSON <code>Date</code>s. ISO strings sort lexicographically in date order, so substrings work — or convert properly.</p>
+<pre><code>// Q2 — revenue by month
+db.rides.aggregate([
+  { $match: { status: "Completed" } },
+  { $group: { _id: { $substr: ["$date", 0, 7] },        // "2024-03"
+              revenue: { $sum: "$booking_value" },
+              rides:   { $sum: 1 } }},
+  { $sort: { _id: 1 } }
+])
+// → Mar strongest ₹1,99,972 / 859 rides · Jun weakest ₹1,66,260
+//   twelve months sum to the ₹22,02,449 of completed value
+
+// Q3 — busiest hour of day
+db.rides.aggregate([
+  { $group: { _id: { $toInt: { $substr: ["$booked_at", 11, 2] } },
+              bookings: { $sum: 1 } }},
+  { $sort: { bookings: -1 } }, { $limit: 5 }
+])
+
+// The convert-first alternative:
+{ $hour: { $dateFromString: { dateString: "$booked_at" } } }
+{ $dateToString: { format: "%Y-%m",
+    date: { $dateFromString: { dateString: "$booked_at" } } } }</code></pre>
+    <div class="note-strip"><strong>Fix types at ingestion, not in every downstream pipeline.</strong> Converting 15,000 docs per query is cheap; converting 15 million is a daily tax — and strings support no range arithmetic, no time zones, no date-aware indexes.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Question 3 · The Finding</div>
+    <h2>Demand is bimodal — and supply arrives late</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>Hours carrying real volume</h3>
+        <table>
+          <thead><tr><th>Hour</th><th>Bookings</th><th>Fail %</th></tr></thead>
+          <tbody>
+            <tr><td><strong>18:00</strong></td><td>1,373</td><td>37.14%</td></tr>
+            <tr><td>19:00</td><td>1,246</td><td>35.96%</td></tr>
+            <tr><td>09:00</td><td>1,172</td><td>36.18%</td></tr>
+            <tr><td>08:00</td><td>1,076</td><td>36.71%</td></tr>
+            <tr><td><strong>17:00</strong></td><td>1,062</td><td><strong>39.92%</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="box amber">
+        <h3>⚠️ 17:00 — the weak point</h3>
+        <p class="big-stat">39.92%</p>
+        <p class="big-stat-lbl">worst failure rate among the hours that carry volume</p>
+        <p style="margin-top:.75rem">Higher than the <strong>18:00 peak's 37.14%</strong> — even though 18:00 takes 1,373 bookings to 17:00's 1,062. The evening surge <em>begins</em> at 17:00, and that is exactly where completions collapse.</p>
+      </div>
+      <div class="box blue">
+        <h3>🚫 Rank by rate alone and you get this</h3>
+        <table>
+          <tbody>
+            <tr><td><strong>03:00</strong></td><td>46</td><td><strong>43.48%</strong></td></tr>
+            <tr><td>07:00</td><td>637</td><td>41.60%</td></tr>
+            <tr><td>16:00</td><td>764</td><td>40.45%</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:.5rem">46 bookings all year — one every eight days. One extra failure moves that rate two points. It is noise, and it would have you staffing drivers at 3 a.m.</p>
+<pre><code>{ $match: { bookings: { $gte: 1000 } } }
+// ← guard, after $group, before ranking</code></pre>
+      </div>
+    </div>
+    <div class="note-strip"><strong>A rate without a denominator is not a finding.</strong> State the threshold out loud: "worst failure rate, <em>among hours with at least 1,000 bookings</em>". Then the recommendation writes itself — time driver incentives to <strong>16:30</strong>, not 18:00.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Questions 4 &amp; 5</div>
+    <h2>Where and why bookings fail</h2>
+<pre><code>// Q4 — cancellation rate by pickup. $match AFTER $group = SQL's HAVING:
+// a rate on a thin sample is noise, so guard with a volume threshold.
+db.rides.aggregate([
+  { $group: {
+      _id: "$route.pickup",
+      bookings:  { $sum: 1 },
+      cancelled: { $sum: { $cond: [{ $in: ["$status",
+          ["Cancelled by Driver","Cancelled by Customer","No Driver Found"]] }, 1, 0] }}
+  }},
+  { $match: { bookings: { $gte: 1000 } } },
+  { $addFields: { cancellation_rate_pct: { $round: [
+      { $multiply: [{ $divide: ["$cancelled","$bookings"] }, 100] }, 2 ]}}},
+  { $sort: { cancellation_rate_pct: -1 } }, { $limit: 10 }
+])</code></pre>
+    <div class="cols">
+      <div class="box">
+        <h3>Worst pickups</h3>
+        <table>
+          <tbody>
+            <tr><td>Noida Sector 62</td><td>1,209</td><td><strong>33.50%</strong></td></tr>
+            <tr><td>New Delhi Rly Stn</td><td>1,179</td><td>33.16%</td></tr>
+            <tr><td>Connaught Place</td><td>1,139</td><td>32.84%</td></tr>
+            <tr><td>IGI Airport</td><td>1,183</td><td>32.80%</td></tr>
+            <tr><td>Gurgaon Cyber City</td><td>1,178</td><td>31.24%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="box blue">
+        <h3>Q5 — who cancels, and why</h3>
+        <p><strong>Driver (2,698):</strong> customer related issue 27.02% · more than permitted people 24.68% · personal &amp; car 24.17% · customer coughing/sick 24.13%</p>
+        <p style="margin-top:.5rem"><strong>Customer (1,022):</strong> driver not moving toward pickup 20.65% · AC not working 20.55% · <strong>driver asked to cancel 20.35%</strong> · change of plans 19.86% · wrong address 18.59%</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>The asymmetry is the story.</strong> Drivers cancel 2.6× more than customers — and "driver asked to cancel" sits inside a fifth of <em>customer</em> cancellations too. The reported split <em>understates</em> the driver side. Intervene on supply behaviour.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Question 7 · Serving the Dashboard</div>
+    <h2>Every KPI in one pass, then materialise it</h2>
+<pre><code>db.rides.aggregate([{ $facet: {
+  headline: [
+    { $group: { _id: null,                       // null = one grand total
+        total_bookings: { $sum: 1 },
+        completed: { $sum: { $cond: [{ $eq: ["$status","Completed"] }, 1, 0] }},
+        completed_value: { $sum: "$booking_value" },
+        avg_distance_km: { $avg: "$ride_distance" } }}
+  ],
+  by_status:   [ { $group: { _id: "$status", n: { $sum: 1 } } },
+                 { $sort: { n: -1 } } ],
+  payment_mix: [ { $match: { payment_method: { $exists: true } } },
+                 { $group: { _id: "$payment_method", n: { $sum: 1 } } } ],
+  fare_bands:  [ { $match: { booking_value: { $exists: true } } },
+                 { $bucket: { groupBy: "$booking_value",
+                     boundaries: [0,100,250,500,1000], default: "1000+",
+                     output: { rides: { $sum: 1 } } } } ]
+}}])
+// headline → 15,000 bookings · 9,343 completed · 62.29% · ₹22,02,449 · 10.87 km
+// payment_mix → UPI 45.03% · Cash 25.31% · Wallet 11.79% · Credit 10.79% · Debit 7.08%</code></pre>
+    <p>Then write the answer down once, so the dashboard reads <em>results</em> instead of raw data:</p>
+<pre><code>{ $out: "monthly_revenue" }                              // full rebuild, destructive
+{ $merge: { into: "monthly_revenue", on: "_id",
+            whenMatched: "replace", whenNotMatched: "insert" } }   // incremental, safe</code></pre>
+    <div class="note-strip"><strong>Careful:</strong> a <code>$facet</code> sub-pipeline cannot use an index — the stream is already read. Put any index-eligible <code>$match</code> <em>before</em> the <code>$facet</code>, never only inside it.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Wrap-Up</div>
+    <h2>Six things to carry forward</h2>
+    <ol>
+      <li><strong>An unindexed query is <code>O(n)</code>.</strong> <code>COLLSCAN</code> reads everything; a B-tree <code>IXSCAN</code> is ~<code>O(log n)</code>, so growth stops mattering.</li>
+      <li><strong>Compound field order is decided by ESR</strong> — Equality, Sort, Range — because a range selects a span, and nothing stays sorted behind a span.</li>
+      <li><strong>Judge a query by <code>totalDocsExamined ÷ nReturned</code>, not milliseconds.</strong> 1:1 is perfect; a covered query examines zero documents.</li>
+      <li><strong>Indexes are not free.</strong> Every write pays for every index and they compete with documents for RAM. Index the queries you run; drop what <code>$indexStats</code> shows unused.</li>
+      <li><strong>A pipeline is an ordered conveyor belt</strong> that maps almost one-to-one onto SQL: <code>$match</code>≈WHERE, <code>$group</code>≈GROUP BY, <code>$sort</code>≈ORDER BY, <code>$project</code>≈SELECT, <code>$lookup</code>≈LEFT JOIN.</li>
+      <li><strong><code>$match</code> and <code>$limit</code> go first</strong> — later stages then do less work, and only a leading <code>$match</code> can use an index. Materialise with <code>$out</code>/<code>$merge</code>.</li>
+    </ol>
+    <div class="note-strip"><strong>Next — Lecture 15: Atlas Charts &amp; the Uber dashboard.</strong> Your <code>$facet</code> becomes the KPI header, the hourly pipeline becomes the bimodal demand curve with its 17:00 spike, and <code>monthly_revenue</code> drives the trend line. <strong>Bring working pipelines — the charts are only as good as the queries underneath.</strong></div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+/* BDMA — extra components for the site-level pages (assignments, commands).
+   Loaded on top of notes.css, which supplies the typography. */
+
+/* ---------- GRADING BREAKDOWN ---------- */
+.grade-list { display: flex; flex-direction: column; gap: 1.1rem; margin: 1.5rem 0; }
+.grade-row { display: flex; flex-direction: column; gap: 6px; }
+.grade-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.grade-name { font-size: .92rem; font-weight: 600; color: var(--text); }
+.grade-pct {
+  font-size: .9rem; font-weight: 700; color: var(--accent-hl);
+  font-family: 'JetBrains Mono', ui-monospace, monospace; white-space: nowrap;
+}
+.grade-track { height: 9px; background: var(--bg3); border-radius: 5px; overflow: hidden; }
+.grade-fill { height: 100%; background: var(--accent-hl); border-radius: 5px; }
+.grade-fill.blue  { background: var(--blue); }
+.grade-fill.amber { background: var(--amber); }
+.grade-fill.green { background: var(--green); }
+.grade-note { font-size: .8rem; color: var(--text2); line-height: 1.5; }
+
+/* ---------- ASSESSMENT CARDS ---------- */
+.sub-grid {
+  display: grid; gap: 1rem; margin: 1.5rem 0;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.sub-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1.3rem;
+  display: flex; flex-direction: column; gap: .6rem;
+  position: relative; overflow: hidden;
+}
+.sub-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent-hl);
+}
+.sub-card.team::before    { background: var(--blue); }
+.sub-card.ongoing::before { background: var(--amber); }
+.sub-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+.sub-tag {
+  font-size: .66rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 20px;
+  background: var(--accent-bg); color: var(--accent-hl); border: 1px solid var(--accent-hl);
+  white-space: nowrap;
+}
+.sub-tag.blue  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue); }
+.sub-tag.amber { background: var(--soon-bg);  color: var(--amber); border-color: var(--amber); }
+.sub-weight {
+  font-size: .78rem; font-weight: 700; color: var(--text2);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.sub-card h3 { font-size: 1.02rem; font-weight: 600; margin: 0; }
+.sub-card p { font-size: .85rem; color: var(--text2); line-height: 1.6; margin: 0; }
+.sub-meta {
+  display: flex; flex-wrap: wrap; gap: .4rem .9rem;
+  margin-top: auto; padding-top: .7rem; border-top: 1px solid var(--border);
+  font-size: .75rem; color: var(--text2);
+}
+.sub-meta strong { color: var(--text); font-weight: 600; }
+.sub-card ul { margin: 0; padding-left: 1.1rem; }
+.sub-card ul li { font-size: .83rem; color: var(--text2); line-height: 1.55; margin-bottom: .3rem; }
+
+/* ---------- COMMAND REFERENCE ---------- */
+.cmd-filter { margin: 1.5rem 0 .5rem; }
+.cmd-filter input {
+  width: 100%; padding: .7rem .9rem;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: inherit; font-size: .9rem;
+  transition: border-color .2s;
+}
+.cmd-filter input:focus { outline: none; border-color: var(--accent-hl); }
+.cmd-filter input::placeholder { color: var(--text2); }
+.cmd-count { font-size: .76rem; color: var(--text2); margin-top: .5rem; }
+
+.cmd-group { margin: 2rem 0; }
+.cmd-group > h3 {
+  font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-hl);
+  padding-bottom: .5rem; margin-bottom: .9rem;
+  border-bottom: 1px solid var(--border);
+}
+.cmd-row {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: .75rem 1.25rem; align-items: start;
+  padding: .7rem 0; border-bottom: 1px solid var(--border);
+}
+.cmd-row:last-child { border-bottom: none; }
+.cmd-row code {
+  display: block; font-size: .82rem; line-height: 1.5;
+  word-break: break-word; white-space: pre-wrap;
+}
+.cmd-desc { font-size: .83rem; color: var(--text2); line-height: 1.55; }
+.cmd-desc strong { color: var(--text); font-weight: 600; }
+.cmd-empty { padding: 2rem 0; text-align: center; color: var(--text2); font-size: .88rem; }
+
+@media (max-width: 760px) {
+  .cmd-row { grid-template-columns: 1fr; gap: .35rem; }
+  .grade-top { flex-direction: row; }
+}

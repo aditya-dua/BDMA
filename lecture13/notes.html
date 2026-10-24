@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 13 — Querying Data with MongoDB | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 13 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 2</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 2 · Lecture 13</div>
+  <h1>Querying Data with MongoDB</h1>
+  <p class="subtitle">The full CRUD surface, the operator families, and the discipline that keeps <code>updateMany</code> from ruining your afternoon</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO3</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lecture 12 — <code>bdma.rides</code> loaded and verified at 15,000 documents</span>
+    <span>🔧 <strong>Lab:</strong> Eight graded business questions in <code>mongosh</code></span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#crud">The CRUD Surface</a></li>
+      <li><a href="#operators">Query Operators, Grouped Properly</a></li>
+      <li><a href="#nested">Nested Fields and Dot Notation</a></li>
+      <li><a href="#shaping">Shaping Results: Projection, Sort, Limit, Skip</a></li>
+      <li><a href="#updates">Updating Data in Place</a></li>
+      <li><a href="#counting">Counting, and the Blast-Radius Rule</a></li>
+      <li><a href="#lab">Hands-On — Eight Business Questions</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Perform the full range of CRUD operations — <code>insertOne</code>/<code>insertMany</code>, <code>find</code>/<code>findOne</code>, <code>updateOne</code>/<code>updateMany</code>/<code>replaceOne</code>, <code>deleteOne</code>/<code>deleteMany</code></li>
+    <li><span class="check">✓</span> Select the correct operator family — comparison, logical, element, evaluation, array — for a stated business question</li>
+    <li><span class="check">✓</span> Query nested sub-documents with dot notation and explain why the quotes around <code>"route.pickup"</code> are not optional</li>
+    <li><span class="check">✓</span> Use <code>$exists</code> and <code>$type</code> to reason correctly about fields that are legitimately missing</li>
+    <li><span class="check">✓</span> Shape results with projection, <code>.sort()</code>, <code>.limit()</code> and <code>.skip()</code>, and explain why deep <code>skip</code> paging degrades</li>
+    <li><span class="check">✓</span> Modify data with <code>$set</code>, <code>$unset</code>, <code>$inc</code>, <code>$mul</code>, <code>$rename</code>, <code>$push</code>, <code>$pull</code>, <code>$addToSet</code>, and apply <code>upsert</code> deliberately</li>
+    <li><span class="check">✓</span> Choose between <code>countDocuments()</code> and <code>estimatedDocumentCount()</code> and state the trade-off in one sentence</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–6 min</td><td>Check-In</td><td>Everyone runs <code>db.rides.countDocuments()</code> — it must say 15000</td></tr>
+      <tr><td>6–18 min</td><td>CRUD Surface</td><td>The twelve methods, what each returns, and the singular/plural distinction</td></tr>
+      <tr><td>18–34 min</td><td>Query Operators</td><td>Comparison, logical, element, evaluation, array — with live examples</td></tr>
+      <tr><td>34–44 min</td><td>Dot Notation</td><td><code>route.pickup</code>, <code>ratings.driver</code>, and the missing-field problem</td></tr>
+      <tr><td>44–56 min</td><td>Shaping Results</td><td>Projection, sort, limit, skip; why deep paging is slow</td></tr>
+      <tr><td>56–70 min</td><td>Update Operators</td><td><code>$set</code>, <code>$inc</code>, array operators, <code>upsert</code>, and the blast-radius warning</td></tr>
+      <tr><td>70–86 min</td><td>Lab</td><td>Eight business questions, answered in <code>mongosh</code> and submitted</td></tr>
+      <tr><td>86–90 min</td><td>Wrap-Up</td><td>Debrief the two hardest queries; Lecture 14 preview</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="crud">Section 1: The CRUD Surface</h2>
+
+  <p>Everything you can do to data falls under four verbs. MongoDB exposes each as a pair — one method that touches a single document and one that touches many — and that pairing is the most important safety feature in the API.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Verb</th><th>Single</th><th>Multiple</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Create</strong></td><td><code>insertOne()</code></td><td><code>insertMany()</code></td><td><code>insertedId</code> / <code>insertedIds</code></td></tr>
+      <tr><td><strong>Read</strong></td><td><code>findOne()</code></td><td><code>find()</code></td><td>A document / a <strong>cursor</strong></td></tr>
+      <tr><td><strong>Update</strong></td><td><code>updateOne()</code>, <code>replaceOne()</code></td><td><code>updateMany()</code></td><td><code>matchedCount</code>, <code>modifiedCount</code>, <code>upsertedId</code></td></tr>
+      <tr><td><strong>Delete</strong></td><td><code>deleteOne()</code></td><td><code>deleteMany()</code></td><td><code>deletedCount</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Create</h3>
+  <pre><code>db.rides.insertOne({
+  booking_id: "CNR9000001",
+  booked_at: new Date("2024-12-31T22:15:00Z"),
+  date: "2024-12-31",
+  status: "Completed",
+  customer_id: "CID482910",
+  vehicle_type: "Go Sedan",
+  route: { pickup: "Connaught Place",
+           drop: "Indira Gandhi International Airport" },
+  avg_vtat: 5.2, avg_ctat: 28.4,
+  booking_value: 389.00, ride_distance: 16.2,
+  ratings: { driver: 4.7, customer: 4.9 },
+  payment_method: "UPI"
+})
+
+db.rides.insertMany([
+  { booking_id: "CNR9000002", status: "No Driver Found",
+    customer_id: "CID101010", vehicle_type: "Auto",
+    route: { pickup: "Nehru Place", drop: "Saket" } },
+  { booking_id: "CNR9000003", status: "Cancelled by Customer",
+    customer_id: "CID101010", vehicle_type: "Bike",
+    route: { pickup: "Saket", drop: "Hauz Khas" }, avg_vtat: 11.3,
+    cancellation: { by: "customer", reason: "Driver is not moving towards pickup location" } }
+])</code></pre>
+
+  <div class="callout">
+    <p><strong>Ordered vs unordered inserts.</strong> By default <code>insertMany</code> is <em>ordered</em>: it stops at the first failure and leaves the remainder uninserted. Pass <code>{ ordered: false }</code> to attempt every document and report the failures at the end. For a nightly bulk load of partner data, unordered is usually what you want — one malformed record should not block 40,000 good ones.</p>
+  </div>
+
+  <h3>Read</h3>
+  <p><code>findOne()</code> returns a document — or <code>null</code>. <code>find()</code> returns a <strong>cursor</strong>, a lazy pointer that fetches results in batches as you iterate. That distinction matters: <code>find()</code> on a million-document match does not pull a million documents into memory.</p>
+
+  <pre><code>db.rides.findOne({ booking_id: "CNR3000142" })      // one document or null
+db.rides.find({ status: "Completed" })               // a cursor
+db.rides.find()                                      // every document
+db.rides.find({ vehicle_type: "Auto", payment_method: "Cash" })
+// Comma-separated conditions are an implicit AND.</code></pre>
+
+  <div class="callout blue">
+    <p><strong>In <code>mongosh</code>,</strong> a cursor you do not consume prints the first 20 documents and offers <code>it</code> for the next batch. Use <code>.toArray()</code> to materialise everything, or <code>.count()</code>-style helpers when you only want the number.</p>
+  </div>
+
+  <h3>Update and Delete</h3>
+  <pre><code>db.rides.updateOne(
+  { booking_id: "CNR9000001" },
+  { $set: { "ratings.customer": 5.0 } }
+)
+
+db.rides.replaceOne(
+  { booking_id: "CNR9000002" },
+  { booking_id: "CNR9000002", status: "Cancelled by Customer",
+    customer_id: "CID101010", vehicle_type: "Auto",
+    route: { pickup: "Nehru Place", drop: "Saket" } }
+)
+
+db.rides.deleteOne({ booking_id: "CNR9000003" })
+db.rides.deleteMany({ booking_id: { $regex: "^CNR9" } })</code></pre>
+
+  <div class="callout amber">
+    <p><strong><code>updateOne</code> vs <code>replaceOne</code> — the difference costs data.</strong> <code>updateOne</code> with <code>$set</code> changes only the fields you name and leaves the rest untouched. <code>replaceOne</code> discards the entire existing document (except <code>_id</code>) and substitutes what you supplied. If you forget one field in a <code>replaceOne</code>, that field is gone. Prefer <code>updateOne</code> with <code>$set</code> unless you genuinely mean to overwrite the whole record.</p>
+  </div>
+
+  <h2 id="operators">Section 2: Query Operators, Grouped Properly</h2>
+
+  <p>A MongoDB query is a document that describes the documents you want. Everything beyond exact equality is expressed with operators, which always begin with <code>$</code>. Learning them as five families rather than one long list is the difference between recall and recognition.</p>
+
+  <h3>Family 1 — Comparison</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operator</th><th>Meaning</th><th>Example against <code>rides</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>$eq</code></td><td>Equals (implicit when you write a bare value)</td><td><code>{ status: { $eq: "Completed" } }</code></td></tr>
+      <tr><td><code>$ne</code></td><td>Not equal — <em>also matches documents missing the field</em></td><td><code>{ payment_method: { $ne: "Cash" } }</code></td></tr>
+      <tr><td><code>$gt</code></td><td>Greater than</td><td><code>{ booking_value: { $gt: 500 } }</code></td></tr>
+      <tr><td><code>$gte</code></td><td>Greater than or equal</td><td><code>{ ride_distance: { $gte: 20 } }</code></td></tr>
+      <tr><td><code>$lt</code></td><td>Less than</td><td><code>{ "ratings.driver": { $lt: 3 } }</code></td></tr>
+      <tr><td><code>$lte</code></td><td>Less than or equal</td><td><code>{ avg_vtat: { $lte: 3 } }</code></td></tr>
+      <tr><td><code>$in</code></td><td>Matches any value in a list</td><td><code>{ vehicle_type: { $in: ["Auto", "Bike", "eBike"] } }</code></td></tr>
+      <tr><td><code>$nin</code></td><td>Matches none of the values in a list</td><td><code>{ payment_method: { $nin: ["Cash"] } }</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>// Premium rides: fare above ₹500 on a long trip
+db.rides.find({ booking_value: { $gt: 500 }, ride_distance: { $gte: 20 } })
+
+// The two-wheeler and three-wheeler product lines
+db.rides.find({ vehicle_type: { $in: ["Auto", "Bike", "eBike"] } })
+
+// A fare band — note that both bounds live in one operator document
+db.rides.find({ booking_value: { $gte: 200, $lte: 400 } })</code></pre>
+
+  <div class="callout amber">
+    <p><strong>The <code>$ne</code> trap, and it bites on our data.</strong> <code>{ payment_method: { $ne: "Cash" } }</code> matches every document where <code>payment_method</code> is something other than Cash <em>plus every document where the field does not exist at all</em> — all 4,756 bookings that never completed. If you mean "completed rides paid by something other than cash", you must say so: <code>{ status: "Completed", payment_method: { $ne: "Cash" } }</code>. In MongoDB, a missing field is not equal to anything, which means it is "not equal" to everything.</p>
+  </div>
+
+  <h3>Family 2 — Logical</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operator</th><th>Meaning</th><th>When You Actually Need It</th></tr></thead>
+    <tbody>
+      <tr><td><code>$and</code></td><td>All conditions true</td><td>Only when two conditions apply to the <em>same field</em>; otherwise commas already mean AND</td></tr>
+      <tr><td><code>$or</code></td><td>Any condition true</td><td>Constantly — different fields, either one</td></tr>
+      <tr><td><code>$not</code></td><td>Inverts a single operator expression</td><td>Negating a <code>$regex</code> or a range</td></tr>
+      <tr><td><code>$nor</code></td><td>None of the conditions true</td><td>Exclusion lists: "neither cancelled nor incomplete"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>// Any failed booking — three different statuses count as failure
+db.rides.find({
+  $or: [
+    { status: "Cancelled by Driver" },
+    { status: "Cancelled by Customer" },
+    { status: "No Driver Found" }
+  ]
+})
+// Cleaner, and it uses an index better:
+db.rides.find({ status: { $in: ["Cancelled by Driver",
+                                "Cancelled by Customer",
+                                "No Driver Found"] } })
+
+// Where $and is genuinely required: two conditions on booking_value
+// that cannot both live in one operator document
+db.rides.find({
+  $and: [
+    { booking_value: { $gt: 100 } },
+    { $or: [ { vehicle_type: "Uber XL" }, { ride_distance: { $gt: 25 } } ] }
+  ]
+})
+
+// Neither cancelled nor incomplete
+db.rides.find({
+  $nor: [
+    { status: "Cancelled by Driver" },
+    { status: "Cancelled by Customer" },
+    { status: "Incomplete" }
+  ]
+})
+
+// Everything that does not start at the airport — $not inverts the regex
+db.rides.find({ "route.pickup": { $not: /^Indira Gandhi/ } })</code></pre>
+
+  <h3>Family 3 — Element</h3>
+  <p>These two operators exist because of exactly the situation our dataset models: fields that are legitimately absent.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operator</th><th>Meaning</th><th>Business Question It Answers</th></tr></thead>
+    <tbody>
+      <tr><td><code>$exists</code></td><td>Does the field exist on this document at all?</td><td>"Which bookings produced no revenue?"</td></tr>
+      <tr><td><code>$type</code></td><td>Is the field of this BSON type?</td><td>"Did any loader write fares as strings?"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>// Bookings that generated no revenue at all — 4,756 of them
+db.rides.countDocuments({ booking_value: { $exists: false } })
+
+// Bookings that produced a fare — 10,244 (9,343 completed + 901 incomplete)
+db.rides.countDocuments({ booking_value: { $exists: true } })
+
+// Rated rides only — ratings exist on completed bookings alone
+db.rides.countDocuments({ ratings: { $exists: true } })        // 9343
+
+// The demand-failure signal: no driver was ever assigned,
+// so not even a vehicle arrival time was recorded
+db.rides.countDocuments({ avg_vtat: { $exists: false } })      // 1036
+
+// Data-quality audit: has anything written a fare as a string?
+db.rides.countDocuments({ booking_value: { $type: "string" } }) // 0</code></pre>
+
+  <div class="callout green">
+    <p><strong>Why this is a business skill, not a syntax trick.</strong> In a relational table these would all be <code>NULL</code>, and <code>NULL</code> is ambiguous: it conflates "did not happen", "not applicable", and "we failed to record it". Our schema distinguishes them structurally. <code>avg_vtat</code> missing means no driver was ever assigned — a <em>supply</em> failure. <code>booking_value</code> missing but <code>avg_vtat</code> present means a driver was assigned and then the trip collapsed — a <em>conversion</em> failure. Those two numbers go to different teams with different fixes.</p>
+  </div>
+
+  <h3>Family 4 — Evaluation</h3>
+  <p>The one you will use is <code>$regex</code>, for pattern matching on strings.</p>
+
+  <pre><code>// Every pickup in Noida, case-insensitive
+db.rides.find({ "route.pickup": { $regex: "Noida", $options: "i" } })
+
+// Equivalent shorthand using a JavaScript literal
+db.rides.find({ "route.pickup": /Noida/i })
+
+// Anchored to the start — this one can use an index
+db.rides.find({ "route.drop": { $regex: "^Gurgaon" } })
+
+// Either end of the trip touches the airport. The dataset stores the
+// full name "Indira Gandhi International Airport", so match on a substring.
+db.rides.find({ $or: [ { "route.pickup": /Airport/ },
+                       { "route.drop": /Airport/ } ] })</code></pre>
+
+  <div class="callout amber">
+    <p><strong>Performance warning.</strong> A regex anchored at the start of the string (<code>/^Gurgaon/</code>) can use a standard index, because the index is sorted and the engine can seek to the right prefix. An unanchored regex (<code>/Noida/</code>) or a case-insensitive one cannot — it must examine every value in the collection. Fine on 15,000 documents; a visible outage on 15 million. For real text search, use a text index or Atlas Search rather than a regex.</p>
+  </div>
+
+  <h3>Family 5 — Array</h3>
+  <p>Our <code>rides</code> documents do not contain arrays, so we demonstrate these on a realistic extension: a <code>tags</code> array and a <code>fare_breakdown</code> array of sub-documents that a surge-pricing feature would add.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operator</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>$all</code></td><td>The array contains <em>all</em> of these values, in any order</td></tr>
+      <tr><td><code>$elemMatch</code></td><td><em>One single element</em> satisfies <em>all</em> the stated conditions</td></tr>
+      <tr><td><code>$size</code></td><td>The array has exactly this many elements</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>// Seed a few tagged documents so the operators have something to match
+db.rides.updateMany(
+  { "route.pickup": "Indira Gandhi International Airport", status: "Completed" },
+  { $set: { tags: ["airport", "premium"] } }
+)
+
+// Bare value: matches if the array CONTAINS it
+db.rides.find({ tags: "airport" })
+
+// $all: must contain both
+db.rides.find({ tags: { $all: ["airport", "premium"] } })
+
+// $size: exactly two tags
+db.rides.find({ tags: { $size: 2 } })
+
+// $elemMatch on an array of sub-documents — the crucial one
+db.rides.find({
+  fare_breakdown: { $elemMatch: { component: "surge", amount: { $gt: 50 } } }
+})</code></pre>
+
+  <div class="callout blue">
+    <p><strong>Why <code>$elemMatch</code> exists.</strong> Written without it, <code>{ "fare_breakdown.component": "surge", "fare_breakdown.amount": { $gt: 50 } }</code> matches a document where <em>some</em> element is a surge line and <em>some</em> element has an amount above 50 — not necessarily the same element. A ₹60 base fare plus a ₹20 surge would match, which is wrong. <code>$elemMatch</code> forces both conditions onto one element. This is the array equivalent of the <code>$ne</code> trap: the query runs, returns results, and quietly answers a different question.</p>
+  </div>
+
+  <h2 id="nested">Section 3: Nested Fields and Dot Notation</h2>
+
+  <p>Two of our most useful fields are sub-documents. Reaching inside them uses dot notation, and the path <strong>must be quoted</strong> — <code>route.pickup</code> is not a valid JavaScript identifier, so <code>"route.pickup"</code> it is.</p>
+
+  <pre><code>db.rides.find({ "route.pickup": "Indira Gandhi International Airport" })
+db.rides.find({ "route.drop": "Aerocity" })
+db.rides.find({ "ratings.driver": { $lt: 3 } })
+db.rides.find({ "ratings.driver": { $gte: 4.8 }, "ratings.customer": { $gte: 4.8 } })
+db.rides.find({ "cancellation.by": "driver" })
+db.rides.find({ "cancellation.reason": "Personal &amp; Car related issues" })
+db.rides.find({ "incomplete.reason": "Vehicle Breakdown" })
+
+// The airport corridor, both directions
+db.rides.find({
+  $or: [
+    { "route.pickup": "Indira Gandhi International Airport",
+      "route.drop":   "Gurgaon Cyber City" },
+    { "route.pickup": "Gurgaon Cyber City",
+      "route.drop":   "Indira Gandhi International Airport" }
+  ]
+})</code></pre>
+
+  <div class="callout amber">
+    <p><strong>Dot notation is not the same as matching the whole sub-document.</strong></p>
+    <p><code>db.rides.find({ route: { pickup: "Indira Gandhi International Airport" } })</code> matches only documents whose <code>route</code> sub-document contains <em>exactly and only</em> the field <code>pickup</code> with that value. Since every route also has a <code>drop</code>, this returns <strong>zero results</strong> — silently.</p>
+    <p><code>db.rides.find({ "route.pickup": "Indira Gandhi International Airport" })</code> matches 1,183 documents, which is what you meant. Whole-document matching is also order-sensitive: <code>{ pickup, drop }</code> does not match <code>{ drop, pickup }</code>. Use dot notation unless you are deliberately matching an entire embedded object.</p>
+  </div>
+
+  <h2 id="shaping">Section 4: Shaping Results — Projection, Sort, Limit, Skip</h2>
+
+  <h3>Projection — Ask Only for What You Need</h3>
+  <p>The second argument to <code>find()</code> controls which fields come back. <code>1</code> includes, <code>0</code> excludes, and you may not mix the two — except for <code>_id</code>, which can always be suppressed.</p>
+
+  <pre><code>// Include only these three fields (plus _id, which comes by default)
+db.rides.find(
+  { status: "Completed" },
+  { booking_id: 1, booking_value: 1, "route.pickup": 1 }
+)
+
+// Drop _id as well — the common reporting form
+db.rides.find(
+  { status: "Completed" },
+  { _id: 0, booking_id: 1, booking_value: 1, ride_distance: 1 }
+)
+
+// Exclusion style: everything EXCEPT these
+db.rides.find({ status: "Completed" }, { ratings: 0, avg_vtat: 0, avg_ctat: 0 })
+
+// INVALID — cannot mix inclusion and exclusion
+// db.rides.find({}, { booking_id: 1, ratings: 0 })</code></pre>
+
+  <div class="callout blue">
+    <p><strong>Projection is a cost control, not a cosmetic.</strong> Every field you return is read from disk, serialised, pushed across the network, and parsed by the client. Returning 14 fields to a dashboard that renders 3 wastes roughly four-fifths of that work on every request. On a metered cloud plan, network egress is a line item on the invoice.</p>
+  </div>
+
+  <h3>Sorting, Limiting, Paging</h3>
+  <pre><code>// The ten most expensive completed rides
+db.rides.find(
+  { status: "Completed" },
+  { _id: 0, booking_id: 1, booking_value: 1, "route.pickup": 1, "route.drop": 1 }
+).sort({ booking_value: -1 }).limit(10)
+
+// 1 = ascending, -1 = descending; multiple keys sort left to right
+db.rides.find({ status: "Completed" })
+  .sort({ vehicle_type: 1, booking_value: -1 })
+  .limit(20)
+
+// Page 3 of a 20-per-page listing
+db.rides.find({ status: "Completed" })
+  .sort({ booked_at: -1 })
+  .skip(40)
+  .limit(20)</code></pre>
+
+  <div class="callout">
+    <p><strong>Order of operations.</strong> Regardless of the order you chain them, the server applies <code>sort</code> → <code>skip</code> → <code>limit</code>. You cannot limit first and then sort the survivors — which is exactly what you want, because "top ten by fare" must sort the whole matching set before taking ten.</p>
+  </div>
+
+  <h3>Why Deep <code>skip</code> Is Slow</h3>
+  <p><code>skip(n)</code> does not jump. The server must still produce the first <code>n</code> results in sorted order and then throw them away. Page 2 discards 20 documents and nobody notices. Page 500 discards 10,000 documents to return 20 — the same work as scanning half the collection, repeated on every page load.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Page</th><th>Query</th><th>Documents Processed to Return 20</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>.limit(20)</code></td><td>20</td></tr>
+      <tr><td>10</td><td><code>.skip(180).limit(20)</code></td><td>200</td></tr>
+      <tr><td>100</td><td><code>.skip(1980).limit(20)</code></td><td>2,000</td></tr>
+      <tr><td>500</td><td><code>.skip(9980).limit(20)</code></td><td>10,000</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The fix — range pagination (the "infinite scroll" pattern).</strong> Instead of counting pages, remember the last value you saw and ask for everything after it. The work is constant per page regardless of depth, which is why every high-traffic feed is built this way and why "jump to page 500" quietly disappeared from modern interfaces.</p>
+  </div>
+
+  <pre><code>// Page 1
+db.rides.find({ status: "Completed" }).sort({ booked_at: -1 }).limit(20)
+
+// Page 2 — pass the last booked_at you displayed
+db.rides.find({ status: "Completed",
+                booked_at: { $lt: ISODate("2024-11-18T09:14:00Z") } })
+  .sort({ booked_at: -1 }).limit(20)</code></pre>
+
+  <h2 id="updates">Section 5: Updating Data in Place</h2>
+
+  <p>Never read a document, change it in your application, and write the whole thing back. That pattern loses any change another process made in between. Use update operators, which modify fields on the server atomically.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operator</th><th>Effect</th><th>Realistic Use on <code>rides</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>$set</code></td><td>Sets a field, creating it if absent</td><td>Correct a mis-recorded drop point</td></tr>
+      <tr><td><code>$unset</code></td><td>Removes a field entirely</td><td>Purge a rating after a fraud investigation</td></tr>
+      <tr><td><code>$inc</code></td><td>Adds a number (negative to subtract)</td><td>Apply a ₹25 goodwill adjustment</td></tr>
+      <tr><td><code>$mul</code></td><td>Multiplies a numeric field</td><td>Apply a 1.2× surge to a fare band</td></tr>
+      <tr><td><code>$rename</code></td><td>Renames a field</td><td>Migrate <code>avg_ctat</code> to <code>trip_duration_min</code></td></tr>
+      <tr><td><code>$push</code></td><td>Appends to an array (duplicates allowed)</td><td>Add an audit entry</td></tr>
+      <tr><td><code>$addToSet</code></td><td>Appends only if not already present</td><td>Add a tag without creating duplicates</td></tr>
+      <tr><td><code>$pull</code></td><td>Removes all matching elements from an array</td><td>Retire a deprecated tag</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>// $set — correct one booking's drop point
+db.rides.updateOne(
+  { booking_id: "CNR3000142" },
+  { $set: { "route.drop": "Aerocity Metro Station" } }
+)
+
+// $set creates the field if it does not exist
+db.rides.updateMany(
+  { status: "Completed", booking_value: { $gt: 600 } },
+  { $set: { segment: "premium" } }
+)
+
+// $unset — remove a disputed rating
+db.rides.updateOne(
+  { booking_id: "CNR3000142" },
+  { $unset: { "ratings.customer": "" } }       // the value is ignored
+)
+
+// $inc — a ₹25 goodwill credit on one ride; negative values subtract
+db.rides.updateOne({ booking_id: "CNR3000142" }, { $inc: { booking_value: -25 } })
+
+// $mul — apply a 1.2x evening surge to one corridor
+db.rides.updateMany(
+  { status: "Completed",
+    "route.pickup": "Indira Gandhi International Airport" },
+  { $mul: { booking_value: 1.2 } }
+)
+
+// $rename — a schema migration, run once
+db.rides.updateMany({}, { $rename: { "avg_ctat": "trip_duration_min" } })
+
+// Array operators
+db.rides.updateOne({ booking_id: "CNR3000142" },
+  { $push: { tags: "airport" } })                   // appends, duplicates allowed
+db.rides.updateOne({ booking_id: "CNR3000142" },
+  { $addToSet: { tags: "airport" } })               // no-op if already present
+db.rides.updateOne({ booking_id: "CNR3000142" },
+  { $pull: { tags: "premium" } })                   // removes every match</code></pre>
+
+  <h3><code>upsert</code> — Update If Present, Insert If Not</h3>
+  <p>A third option on any update. If the filter matches nothing, MongoDB creates a document from the filter plus the update. This is how daily rollups and counters are maintained without a read-then-decide round trip.</p>
+
+  <pre><code>db.daily_summary.updateOne(
+  { date: "2024-03-14", vehicle_type: "Go Sedan" },   // the identity
+  { $inc: { bookings: 1, revenue: 412.50 } },          // the change
+  { upsert: true }                                     // create if absent
+)
+// First call  -> inserts { date, vehicle_type, bookings: 1, revenue: 412.50 }
+// Every later -> increments the existing document
+// Response includes upsertedId when it inserted, null when it updated.</code></pre>
+
+  <div class="callout amber">
+    <p><strong>Upsert's sharp edge:</strong> the inserted document is built from the <em>equality</em> terms of your filter. A filter containing <code>{ booking_value: { $gt: 500 } }</code> contributes nothing to the new document, so you can upsert a record that does not satisfy your own filter. Keep upsert filters to plain equality on the fields that define identity.</p>
+  </div>
+
+  <h2 id="counting">Section 6: Counting, and the Blast-Radius Rule</h2>
+
+  <h3><code>countDocuments()</code> vs <code>estimatedDocumentCount()</code></h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th><code>countDocuments(filter)</code></th><th><code>estimatedDocumentCount()</code></th></tr></thead>
+    <tbody>
+      <tr><td><strong>Accepts a filter</strong></td><td>Yes</td><td>No — whole collection only</td></tr>
+      <tr><td><strong>Accuracy</strong></td><td>Exact, always</td><td>Approximate</td></tr>
+      <tr><td><strong>How it works</strong></td><td>Scans the matching documents or index entries</td><td>Reads a cached metadata figure</td></tr>
+      <tr><td><strong>Cost</strong></td><td>Proportional to the match size</td><td>Constant — effectively free</td></tr>
+      <tr><td><strong>Use for</strong></td><td>Anything a human will act on; any filtered count</td><td>"Roughly how big is this collection?" on a status page</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>db.rides.countDocuments()                                   // 15000, exact
+db.rides.estimatedDocumentCount()                           // ~15000, instant
+db.rides.countDocuments({ status: "Completed" })            // 9343
+db.rides.countDocuments({ payment_method: "UPI" })           // 4613
+db.rides.countDocuments({ "route.pickup": "Noida Sector 62" }) // 1209</code></pre>
+
+  <div class="callout blue">
+    <p><strong>The honest trade-off:</strong> <code>estimatedDocumentCount</code> reads a figure the storage engine maintains for its own purposes. After an unclean shutdown that figure can drift. Never put it behind a number a finance team will reconcile; it is for dashboards where "about 15,000" is a perfectly good answer delivered in a millisecond.</p>
+  </div>
+
+  <h3>The Blast-Radius Rule</h3>
+  <div class="callout amber">
+    <p><strong>An empty filter is not a mistake the database will catch.</strong></p>
+    <p><code>db.rides.deleteMany({})</code> deletes all 15,000 documents. It returns <code>{ acknowledged: true, deletedCount: 15000 }</code> and exits successfully, because that is precisely what you asked for. <code>db.rides.updateMany({}, { $set: { status: "Completed" } })</code> rewrites the status of every booking in the collection.</p>
+    <p>There is no confirmation prompt, no <code>ROLLBACK</code>, and no undo. MongoDB has multi-document transactions, but an autocommitted <code>updateMany</code> is not inside one.</p>
+  </div>
+
+  <p>Three habits, in order of value:</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>Write the filter as a <code>find</code> first.</strong> Run <code>db.rides.find(FILTER).limit(5)</code> and <code>db.rides.countDocuments(FILTER)</code>. Look at the number. <em>Then</em> change <code>find</code> to <code>updateMany</code> and keep the identical filter.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>Reach for the singular form by default.</strong> If you believe exactly one document should change, use <code>updateOne</code>. Should your filter turn out to be wrong, you have damaged one record instead of fifteen thousand.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>Read the result object.</strong> <code>matchedCount</code> tells you how many documents the filter found; <code>modifiedCount</code> tells you how many actually changed. If <code>matchedCount</code> is far larger than you expected, stop and investigate before running the next command.</p>
+    <pre><code>{ acknowledged: true, matchedCount: 1183, modifiedCount: 1183,
+  upsertedId: null }</code></pre></div>
+  </div>
+
+  <h2 id="lab">Section 7: Hands-On — Eight Business Questions</h2>
+
+  <p>Work in <code>mongosh</code> against <code>bdma.rides</code>. For each question, submit the query you ran <em>and</em> the result. Marks are for the query; the number is how you check yourself. Several answers are verifiable against the figures from Lecture 12.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p><strong>How healthy is the funnel?</strong> Return the total number of bookings and the number completed, and state the completion rate.</p>
+    <pre><code>db.rides.countDocuments()                          // expect 15000
+db.rides.countDocuments({ status: "Completed" })   // expect 9343 (62.29%)</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p><strong>How much demand do we fail outright?</strong> Count bookings where no driver was ever assigned — use the <em>absence</em> of <code>avg_vtat</code>, not the status string, and explain in one line why both give the same answer here.</p>
+    <pre><code>db.rides.countDocuments({ avg_vtat: { $exists: false } })      // expect 1036
+db.rides.countDocuments({ status: "No Driver Found" })         // expect 1036</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>What are our ten highest-value trips?</strong> Completed rides only. Return booking ID, fare, distance, and both ends of the route — and nothing else.</p>
+    <pre><code>db.rides.find(
+  { status: "Completed" },
+  { _id: 0, booking_id: 1, booking_value: 1, ride_distance: 1,
+    "route.pickup": 1, "route.drop": 1 }
+).sort({ booking_value: -1 }).limit(10)</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Is the airport corridor a premium segment?</strong> Count completed rides starting at the airport with a fare above ₹400, then compare that with all completed rides above ₹400. Note the pickup is stored as its full name, not "IGI".</p>
+    <pre><code>db.rides.countDocuments({
+  status: "Completed",
+  "route.pickup": "Indira Gandhi International Airport",
+  booking_value: { $gt: 400 }
+})
+db.rides.countDocuments({ status: "Completed", booking_value: { $gt: 400 } })</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>Where is service quality failing?</strong> Find completed rides rated below 3.0 by the customer's driver score, showing the route and the fare. These are the rides a quality team should listen to.</p>
+    <pre><code>db.rides.find(
+  { status: "Completed", "ratings.driver": { $lt: 3 } },
+  { _id: 0, booking_id: 1, "ratings.driver": 1, "route.pickup": 1,
+    "route.drop": 1, booking_value: 1, vehicle_type: 1 }
+).sort({ "ratings.driver": 1 }).limit(20)
+
+db.rides.countDocuments({ status: "Completed", "ratings.driver": { $lt: 3 } })</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body"><p><strong>How big is the cash-handling problem?</strong> Count completed rides paid in cash, then count completed rides paid by any digital method. Write your second query two ways — once with <code>$ne</code> and once with <code>$in</code> — and explain which you would ship.</p>
+    <pre><code>db.rides.countDocuments({ status: "Completed", payment_method: "Cash" })
+db.rides.countDocuments({ status: "Completed",
+                          payment_method: { $ne: "Cash" } })
+db.rides.countDocuments({ status: "Completed", payment_method:
+  { $in: ["UPI", "Uber Wallet", "Credit Card", "Debit Card"] } })
+// Both are correct here only because status pins us to completed rides.
+// Drop that filter and $ne silently sweeps in 4,756 fare-less bookings.</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body"><p><strong>Why do drivers cancel?</strong> List the distinct driver-cancellation reasons, then count the single most common one.</p>
+    <pre><code>db.rides.distinct("cancellation.reason", { "cancellation.by": "driver" })
+db.rides.countDocuments({ "cancellation.by": "driver" })      // expect 2698
+db.rides.countDocuments({
+  "cancellation.reason": "Personal &amp; Car related issues"
+})</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body"><p><strong>Tag and then clean up.</strong> Mark every completed ride over ₹600 as <code>segment: "premium"</code>, confirm the count, then remove the field again. Run the <code>countDocuments</code> <em>before</em> the <code>updateMany</code> and compare it with <code>matchedCount</code>.</p>
+    <pre><code>db.rides.countDocuments({ status: "Completed", booking_value: { $gt: 600 } })
+
+db.rides.updateMany(
+  { status: "Completed", booking_value: { $gt: 600 } },
+  { $set: { segment: "premium" } }
+)
+// check: matchedCount must equal the count above
+
+db.rides.countDocuments({ segment: "premium" })
+
+db.rides.updateMany({ segment: { $exists: true } }, { $unset: { segment: "" } })
+db.rides.countDocuments({ segment: { $exists: true } })        // expect 0</code></pre></div>
+  </div>
+
+  <div class="callout green">
+    <p><strong>Stretch question for the quick finishers.</strong> Using only what is in this lecture, work out how much of the ₹22,02,449 completed revenue came through UPI. You can count the bookings with <code>countDocuments</code>, but you cannot <em>sum</em> the fares — <code>find</code> has no <code>SUM</code>. That wall is deliberate, and climbing it is what the aggregation pipeline in Lecture 14 is for.</p>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>CRUD comes in singular/plural pairs, and that pairing is a safety feature.</strong> <code>find()</code> returns a lazy cursor, not a list; <code>replaceOne</code> overwrites the whole document while <code>updateOne</code> with <code>$set</code> touches only named fields.</li>
+      <li><strong>Learn operators as five families</strong> — comparison (<code>$eq $ne $gt $gte $lt $lte $in $nin</code>), logical (<code>$and $or $not $nor</code>), element (<code>$exists $type</code>), evaluation (<code>$regex</code>), array (<code>$all $elemMatch $size</code>) — and the right one is usually obvious from the business question.</li>
+      <li><strong>A missing field is not equal to anything, so it is "not equal" to everything.</strong> <code>$ne</code> sweeps in documents lacking the field; <code>$exists</code> is how you ask the question you actually meant.</li>
+      <li><strong>Dot notation reaches into sub-documents; whole-object matching does not.</strong> <code>{ "route.pickup": "Indira Gandhi International Airport" }</code> finds 1,183 rides. <code>{ route: { pickup: "Indira Gandhi International Airport" } }</code> finds none, silently.</li>
+      <li><strong>Projection is cost control and deep <code>skip</code> is a trap.</strong> Return only the fields you render; page with a range filter on the sort key, not with <code>skip(9980)</code>.</li>
+      <li><strong>An empty filter is a valid filter.</strong> <code>updateMany({}, …)</code> and <code>deleteMany({})</code> hit every document, with no prompt and no undo. Prove the filter with <code>find</code> and <code>countDocuments</code> first; read <code>matchedCount</code> afterwards.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 14 — The Aggregation Framework</h3>
+    <p><code>find</code> retrieves documents; it cannot compute. To produce "average fare by vehicle type", "revenue per payment method", or "failure rate by hour of day" you need the aggregation pipeline — <code>$match</code>, <code>$group</code>, <code>$sort</code>, <code>$project</code>, <code>$unwind</code> and <code>$lookup</code> composed in stages. That is where ₹22,02,449 and the 10.87 km average stop being numbers we told you and start being numbers you derive.</p>
+    <p>It is also where you meet the first real analytical trap. Rank the 24 hours of the day by failure rate and 03:00 comes top at 43.48% — on 46 bookings. That is a small-sample artifact, and acting on it sends an operations team chasing noise at three in the morning. Put a <code>{ $match: { bookings: { $gte: 1000 } } }</code> after the <code>$group</code> and the real answer appears: among the hours that actually carry volume, 17:00 is worst at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062. <strong>A rate without a denominator is not an insight.</strong></p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture12/notes.html">← Lecture 12</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture14/notes.html">Lecture 14 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>

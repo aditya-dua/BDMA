@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 11 Slides — Introduction to Non-Relational Databases | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 11 · Introduction to Non-Relational Databases</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 17</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 1 · Lecture 11</div>
+    <h1>Introduction to <span>Non-Relational</span> Databases</h1>
+    <p class="lead">Why the relational model cracked at web scale — and the four NoSQL families that replaced it.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO1</strong></span>
+      <span>📦 <strong>MongoDB 101</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Where We Are</div>
+    <h2>Ten lectures of relational thinking</h2>
+    <p>You can now design a normalised schema, write joins, and reason about transactions. That toolkit solves a large share of business problems — and this module is not here to take it away.</p>
+    <div class="cols">
+      <div class="box green">
+        <h3>What stays true</h3>
+        <p>For structured, transactional, single-server workloads, relational databases remain the correct default. Banks still run on them.</p>
+      </div>
+      <div class="box accent">
+        <h3>What we add</h3>
+        <p>A second toolkit for workloads where the relational model is a poor fit — and the judgement to tell the two apart.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Today's question:</strong> what kind of problem made the industry build something else?</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Breaking Point</div>
+    <h2>Three pressures, roughly 2004–2010</h2>
+    <table>
+      <thead><tr><th>Pressure</th><th>What Happened</th><th>Why SQL Struggled</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Volume</strong></td><td>Datasets outgrew the largest single server available</td><td>The relational model assumes one authoritative machine</td></tr>
+        <tr><td><strong>Schema churn</strong></td><td>Product shape changed weekly, not yearly</td><td>Every change is an <code>ALTER TABLE</code> on a live system</td></tr>
+        <tr><td><strong>Impedance mismatch</strong></td><td>Apps work in nested objects; tables are flat</td><td>Shred on write, join on read — forever</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>Scale check:</strong> PostgreSQL handles terabytes comfortably. NoSQL was invented by firms managing <strong>petabytes</strong> — a thousandfold gap.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Pressure 2 · Illustrated</div>
+    <h2>Model a catalogue of books, fridges and shoes</h2>
+    <p>Every product type has a different set of attributes. In a relational schema you get three unattractive options:</p>
+    <table>
+      <thead><tr><th>Option</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td><strong>One wide table</strong></td><td>Hundreds of mostly-<code>NULL</code> columns; new type = schema migration</td></tr>
+        <tr><td><strong>Table per type</strong></td><td>"All products under ₹2,000" becomes a <code>UNION</code> across dozens of tables</td></tr>
+        <tr><td><strong>Entity-Attribute-Value</strong></td><td>Everything becomes a string; the database can no longer validate or index</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">A document database sidesteps this: <strong>each document carries exactly the fields it needs.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Pressure 3 · Illustrated</div>
+    <h2>The object-relational impedance mismatch</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>What the app wants</h3>
+<pre><code>{
+  name: "Priya Sharma",
+  addresses: [
+    { type: "home", city: "Delhi" },
+    { type: "work", city: "Gurgaon" }
+  ]
+}</code></pre>
+      </div>
+      <div class="box amber">
+        <h3>What SQL requires</h3>
+<pre><code>customers(id, name)
+addresses(id, customer_id,
+          type, city, pin)
+
+-- plus a JOIN on every read</code></pre>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Business translation:</strong> this is paid for in developer hours — mapping layers, join debugging, migrations. A direct drag on time-to-market.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Root Cause</div>
+    <h2>Vertical vs horizontal scaling</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>⬆️ Scale Up</h3>
+        <p>Buy a bigger machine. Simple, no app changes, joins and transactions stay easy.</p>
+        <p style="margin-top:.6rem"><strong>Limits:</strong> cost rises faster than capacity, a hard physical ceiling, single point of failure.</p>
+      </div>
+      <div class="box accent">
+        <h3>➡️ Scale Out</h3>
+        <p>Add commodity machines, spread the data. Capacity grows near-linearly; one node can die safely.</p>
+        <p style="margin-top:.6rem"><strong>Limits:</strong> data is now distributed — joins, transactions and consistency get genuinely hard.</p>
+      </div>
+    </div>
+    <div class="note-strip">Almost everything else in this module is a <strong>consequence</strong> of choosing to scale out.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Key Insight</div>
+    <h2>Why sharding breaks joins</h2>
+    <p><strong>Sharding:</strong> split the data by key — customers A–M on Server 1, N–Z on Server 2. That is what makes horizontal scale work.</p>
+    <p>Now run <code>SELECT ... FROM orders JOIN customers</code>. The orders are on Server 1, the matching customers on Server 2. The database must ship data across the network <em>mid-query</em>.</p>
+    <div class="box amber">
+      <h3>The founding trade of NoSQL</h3>
+      <p>Rather than make distributed joins fast — close to impossible — <strong>restructure the data so the join is never needed.</strong> Store the order <em>with</em> its customer details embedded. You accept duplication to buy horizontal scale.</p>
+    </div>
+    <div class="note-strip">Remember this slide. It explains every modelling decision in Lectures 12–16.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Distributed Systems</div>
+    <h2>CAP theorem — stated correctly</h2>
+    <table>
+      <thead><tr><th>Property</th><th>Meaning</th><th>If You Lose It</th></tr></thead>
+      <tbody>
+        <tr><td><strong>C</strong> Consistency</td><td>Every read returns the latest write</td><td>Users briefly see different answers</td></tr>
+        <tr><td><strong>A</strong> Availability</td><td>Every request gets a response</td><td>Some requests fail or time out</td></tr>
+        <tr><td><strong>P</strong> Partition tolerance</td><td>Works when the network splits</td><td>A network fault downs everything</td></tr>
+      </tbody>
+    </table>
+    <div class="box amber">
+      <h3>The correction most people need</h3>
+      <p>You do not <em>choose</em> whether to have partitions — networks fail. P is mandatory. The real choice is what to do <strong>during</strong> a split: refuse requests (CP) or answer and reconcile later (AP).</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">CAP as a Business Decision</div>
+    <h2>The network just split. What do you do?</h2>
+    <div class="cols">
+      <div class="box blue">
+        <h3>CP — protect correctness</h3>
+        <p><strong>Bank transfer.</strong> Refuse the transaction rather than risk double-spending a balance.</p>
+        <p style="margin-top:.5rem"><strong>Customer sees:</strong> "Temporarily unavailable."</p>
+        <p style="margin-top:.5rem"><strong>Systems:</strong> MongoDB, HBase, Redis Cluster</p>
+      </div>
+      <div class="box green">
+        <h3>AP — protect the sale</h3>
+        <p><strong>Shopping cart.</strong> Accept the item now, reconcile versions when the network heals.</p>
+        <p style="margin-top:.5rem"><strong>Customer sees:</strong> a working site.</p>
+        <p style="margin-top:.5rem"><strong>Systems:</strong> Cassandra, DynamoDB, CouchDB</p>
+      </div>
+    </div>
+    <div class="note-strip">The question is never "which is better" — it is <strong>"what does a stale read cost us?"</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Consistency Models</div>
+    <h2>ACID vs BASE</h2>
+    <table>
+      <thead><tr><th></th><th>ACID</th><th>BASE</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Promise</strong></td><td>All-or-nothing; never in between</td><td>Always answers; replicas converge shortly</td></tr>
+        <tr><td><strong>Optimises</strong></td><td>Correctness</td><td>Availability and scale</td></tr>
+        <tr><td><strong>Right for</strong></td><td>Payments, ledgers, inventory, bookings</td><td>Feeds, recommendations, analytics, sessions</td></tr>
+        <tr><td><strong>Wrong for</strong></td><td>Global write scale</td><td>Anything where staleness costs money</td></tr>
+      </tbody>
+    </table>
+    <div class="box green">
+      <h3>How the debate actually resolved</h3>
+      <p>MongoDB has had multi-document ACID transactions since v4.0 (2018). The modern skill is not picking a camp — it is knowing <strong>which guarantee each operation needs.</strong></p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Taxonomy</div>
+    <h2>"NoSQL" is four different things</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>🔑 Key-Value</h3>
+        <p>A giant dictionary. Sub-millisecond reads, but you can <em>only</em> fetch by key.</p>
+        <p style="margin-top:.5rem"><strong>Redis</strong>, DynamoDB · caching, sessions, counters</p>
+      </div>
+      <div class="box accent">
+        <h3>📄 Document</h3>
+        <p>Structured JSON records. Query and index <em>inside</em> the record.</p>
+        <p style="margin-top:.5rem"><strong>MongoDB</strong>, Couchbase · catalogues, profiles, bookings</p>
+      </div>
+      <div class="box">
+        <h3>🧱 Column-Family</h3>
+        <p>Stored by column. Enormous write throughput; rigid query patterns.</p>
+        <p style="margin-top:.5rem"><strong>Cassandra</strong>, HBase · time-series, telemetry</p>
+      </div>
+      <div class="box">
+        <h3>🕸️ Graph</h3>
+        <p>Relationships <em>are</em> the data. Traversal is constant-time at any scale.</p>
+        <p style="margin-top:.5rem"><strong>Neo4j</strong>, Neptune · fraud rings, recommendations</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Document Model Preview</div>
+    <h2>One booking, one document</h2>
+<pre><code>{
+  "_id":           "CNR3000142",
+  "status":        "Completed",
+  "vehicle_type":  "Go Sedan",
+  "route":   { "pickup": "Connaught Place", "drop": "Aerocity" },
+  "booking_value": 412.50,
+  "ride_distance": 18.4,
+  "ratings": { "driver": 4.6, "customer": 4.8 },
+  "payment_method": "UPI"
+}</code></pre>
+    <p>No joins. No <code>NULL</code> columns for the fields this booking does not use. The stored shape is the shape the application already works with.</p>
+    <div class="note-strip">This is the <strong>actual dataset</strong> you will query in Lectures 13–14 and visualise in Lectures 15–16.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Comparison</div>
+    <h2>Pick by access pattern, not popularity</h2>
+    <table>
+      <thead><tr><th>Family</th><th>Query By</th><th>Best At</th><th>Avoid When</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Key-Value</strong></td><td>Key only</td><td>Raw speed, caching</td><td>You must search by value</td></tr>
+        <tr><td><strong>Document</strong></td><td>Any field</td><td>Flexible, evolving records</td><td>Heavy multi-entity joins</td></tr>
+        <tr><td><strong>Column-Family</strong></td><td>Partition key</td><td>Massive write volume</td><td>Ad-hoc exploration</td></tr>
+        <tr><td><strong>Graph</strong></td><td>Traversal</td><td>Deep relationships</td><td>Bulk aggregation</td></tr>
+        <tr><td><strong>Relational</strong></td><td>SQL</td><td>Transactions, reporting</td><td>Petabyte horizontal scale</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Exercise · 10 minutes</div>
+    <h2>Choose a database. Defend it in one sentence.</h2>
+    <table>
+      <thead><tr><th>#</th><th>Scenario</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td>A ride-hailing firm stores 150,000 bookings a year. Fields differ by product line, and analysts need ad-hoc queries on any attribute.</td></tr>
+        <tr><td><strong>2</strong></td><td>An e-commerce site shows a live "trending in the last 5 minutes" strip on every page load.</td></tr>
+        <tr><td><strong>3</strong></td><td>An insurer wants to find rings of claimants sharing addresses, phones and repair garages.</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Decide on <strong>access pattern</strong> and <strong>cost of staleness</strong> — not on which name you have heard most.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Myth-Busting</div>
+    <h2>Five things people get wrong</h2>
+    <table>
+      <thead><tr><th>Myth</th><th>Reality</th></tr></thead>
+      <tbody>
+        <tr><td>"NoSQL means no SQL"</td><td>It means <strong>not only SQL</strong>. Many NoSQL systems ship SQL-like languages.</td></tr>
+        <tr><td>"There is no schema"</td><td>The schema moves into the <strong>application</strong> — it still exists.</td></tr>
+        <tr><td>"No transactions"</td><td>MongoDB has had ACID transactions since 4.0 (2018).</td></tr>
+        <tr><td>"Always faster"</td><td>Only for its intended access pattern. A bad document model loses to a good index.</td></tr>
+        <tr><td>"It replaces relational"</td><td><strong>Polyglot persistence</strong> — mature firms run several, each doing its best job.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Lab · 10 minutes</div>
+    <h2>Create your free Atlas cluster</h2>
+    <p>Everything from Lecture 12 onward needs this. The M0 tier is free forever, needs no credit card, and gives 512 MB.</p>
+    <ol>
+      <li>Register at <strong>mongodb.com/cloud/atlas/register</strong> with your student email</li>
+      <li>Create project <code>BDMA</code> → <strong>Build a Cluster</strong> → <strong>M0 Free</strong></li>
+      <li>Region: <code>ap-south-1</code> (Mumbai) for lowest latency in India</li>
+      <li><strong>Database Access</strong> → add user <code>bdma_student</code> with <code>readWriteAnyDatabase</code></li>
+      <li><strong>Network Access</strong> → allow <code>0.0.0.0/0</code> <em>(teaching cluster only)</em></li>
+      <li><strong>Connect → Drivers</strong> → copy and save your connection string</li>
+    </ol>
+    <div class="box amber">
+      <h3>⚠️ Never commit a connection string to GitHub</h3>
+      <p>It contains a live password. Scanners find exposed Atlas credentials within minutes of a public push. Keep it in a local <code>.env</code> and <code>.gitignore</code> that file.</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Wrap-Up</div>
+    <h2>Six things to carry forward</h2>
+    <ol>
+      <li><strong>Relational databases did not fail.</strong> A new class of workload appeared that they served badly.</li>
+      <li><strong>Horizontal scaling causes everything else.</strong> Sharding makes joins expensive, which forces new modelling.</li>
+      <li><strong>Partition tolerance is mandatory.</strong> The real choice is CP or AP during a split.</li>
+      <li><strong>Four families, not one NoSQL.</strong> Key-value, document, column-family, graph.</li>
+      <li><strong>Choose on access pattern, cost of staleness, and who operates it</strong> — never on popularity.</li>
+      <li><strong>Polyglot persistence is normal.</strong> Run several stores, each doing its best job.</li>
+    </ol>
+    <div class="note-strip"><strong>Next — Lecture 12:</strong> BSON, the document model, embedding vs referencing, and loading your first collection. <strong>Bring your connection string.</strong></div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

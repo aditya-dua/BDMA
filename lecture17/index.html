@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 17 Slides — Redis &amp; the Key-Value Model | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/slides.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+
+<div class="deck-bar">
+  <div class="deck-bar-left">
+    <a href="../index.html" class="deck-home">← Home</a>
+    <span class="deck-title">Lecture 17 · Redis &amp; the Key-Value Model</span>
+  </div>
+  <div class="deck-bar-right">
+    <span class="deck-counter" id="slideCounter">1 / 18</span>
+    <a href="notes.html" class="deck-btn">📄 Notes</a>
+    <button class="deck-btn" onclick="toggleFullscreen()">⛶ Full</button>
+    <button class="deck-btn" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+<div class="deck">
+  <button class="nav-zone prev" aria-label="Previous slide"></button>
+  <button class="nav-zone next" aria-label="Next slide"></button>
+
+  <section class="slide title-slide active">
+    <div class="title-pill">Module 4 · Lecture 17</div>
+    <h1>Redis &amp; the <span>Key-Value</span> Model</h1>
+    <p class="lead">The speed layer — why a second database earns its place, and how rich values turn a cache into an analytics engine.</p>
+    <div class="title-meta">
+      <span>⏱ <strong>90 minutes</strong></span>
+      <span>🎯 <strong>CLO3</strong></span>
+      <span>🐳 <strong>Redis 7 in Docker</strong></span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Where We Are</div>
+    <h2>Your Atlas dashboard works. Now scale it.</h2>
+    <p>Module 3 gave you 15,000 bookings in MongoDB, an aggregation pipeline for revenue by vehicle and failure rate by hour, and an Atlas Charts dashboard on top.</p>
+    <div class="cols">
+      <div class="box green">
+        <h3>At 15,000 documents</h3>
+        <p>Every dashboard tile fires a pipeline. It scans, groups, sorts, returns — in a few milliseconds. Nobody notices.</p>
+      </div>
+      <div class="box amber">
+        <h3>At 15,000,000</h3>
+        <p>The same pipeline takes seconds. And you re-run it for <strong>every analyst who hits refresh</strong>.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Today's question:</strong> when is the right answer not "tune the query" but "add a different kind of database"?</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Argument Is Arithmetic</div>
+    <h2>The latency budget</h2>
+    <table>
+      <thead><tr><th>Operation</th><th>Latency</th><th>Relative</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>RAM read</strong></td><td>~100 ns</td><td>1×</td><td>Effectively instant</td></tr>
+        <tr><td><strong>SSD read</strong></td><td>~100 µs</td><td>~1,000×</td><td>Fast — but 1,000 RAM reads could have happened</td></tr>
+        <tr><td><strong>DB round trip</strong></td><td>~1–10 ms</td><td>~10,000–100,000×</td><td>Planning + disk + serialise + network</td></tr>
+        <tr><td><strong>"Instant" to a human</strong></td><td>~100 ms</td><td>—</td><td>Your entire page-load budget</td></tr>
+      </tbody>
+    </table>
+    <p>Twelve tiles × 10 ms = <strong>120 ms on data alone</strong>. Budget gone before a pixel is drawn.</p>
+    <div class="note-strip"><strong>Business translation:</strong> latency is conversion, analyst productivity, and whether anyone opens the dashboard twice.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Polyglot Persistence</div>
+    <h2>Two databases, two jobs</h2>
+    <div class="cols">
+      <div class="box blue">
+        <h3>🗄️ MongoDB — system of record</h3>
+        <p>All 15,000 bookings, durably. Answers questions nobody anticipated. <strong>Optimised for completeness and flexibility; costs milliseconds.</strong></p>
+      </div>
+      <div class="box accent">
+        <h3>⚡ Redis — speed layer</h3>
+        <p>A few dozen pre-computed aggregates. <strong>Optimised for read latency; costs you the need to decide in advance what to track.</strong></p>
+      </div>
+    </div>
+    <div class="box green">
+      <h3>The property that makes this safe</h3>
+      <p>Everything in Redis is <strong>derived</strong>. If the process dies, you lose nothing that cannot be rebuilt by replaying <code>bdma.rides</code>. That is why a volatile store is acceptable — and why it must never be the only copy.</p>
+    </div>
+    <div class="note-strip">You met "polyglot persistence" in Lecture 11 as a myth-buster. In Module 4 it becomes an <strong>architecture</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">What It Is</div>
+    <h2>RE·mote DI·ctionary S·erver</h2>
+    <p>Released 2009 by Salvatore Sanfilippo — after an <em>analytics</em> workload proved too slow on MySQL. Three design decisions define it:</p>
+    <div class="cols">
+      <div class="box">
+        <h3>1. Lives in RAM</h3>
+        <p>No buffer pool, no cache-miss path. Every read is a memory read. Ceiling = your RAM.</p>
+      </div>
+      <div class="box">
+        <h3>2. Single-threaded</h3>
+        <p>Commands execute one at a time, in order, to completion. <strong>Deliberate, not a defect.</strong></p>
+      </div>
+      <div class="box">
+        <h3>3. Values are structures</h3>
+        <p>The server understands and manipulates the value in place. This is the whole point.</p>
+      </div>
+    </div>
+    <div class="box amber">
+      <h3>Why single-threaded is a feature</h3>
+      <p>No locks, no contention, no cache-line ping-pong. And every command is <strong>atomic</strong>: <code>INCR</code> is one indivisible step, not read-add-write. 200 concurrent booking events can hit the same counter and the count is exactly right.</p>
+    </div>
+    <div class="note-strip">Modern Redis threads I/O and background saves — but <strong>command execution stays serial</strong>, and that is what you reason about.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Crucial Difference</div>
+    <h2>Not a cache — a data-structure server</h2>
+    <table>
+      <thead><tr><th></th><th>Memcached (plain cache)</th><th>Redis</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Value model</strong></td><td>Opaque blob of bytes</td><td>A typed structure the server understands</td></tr>
+        <tr><td><strong>Add 1 to a counter</strong></td><td>Fetch, parse, add, serialise, write back — and race</td><td><code>INCR key</code> — one atomic server-side op</td></tr>
+        <tr><td><strong>Keep a top-10</strong></td><td>Fetch all, sort in the app, write back</td><td><code>ZINCRBY</code> → <code>ZREVRANGE key 0 9</code></td></tr>
+        <tr><td><strong>Network cost</strong></td><td>Whole value crosses the wire every change</td><td>Only the delta crosses the wire</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">Say it precisely: <strong>a key-value store whose values are rich structures manipulated in place on the server.</strong> That is why a "cache" can power a live dashboard.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Structure 1 of 5</div>
+    <h2>String — counters and cache slots</h2>
+<pre><code>SET    rides:last_loaded "2024-12-31T23:59:59Z"
+INCR   rides:2024-03-14:total           # atomic, O(1), no race
+INCRBYFLOAT revenue:2024-03-14 412.50   # booking_value is decimal
+SETEX  dash:summary:cache 60 '{"total":15000}'   # self-invalidating</code></pre>
+    <div class="cols">
+      <div class="box">
+        <h3>Business uses</h3>
+        <p>Bookings today · running revenue · feature flags · cached report payloads.</p>
+      </div>
+      <div class="box accent">
+        <h3>Why it wins</h3>
+        <p><code>INCR</code> is atomic regardless of writer count, and <code>SETEX</code> makes staleness impossible past the TTL.</p>
+      </div>
+    </div>
+    <div class="note-strip">Up to 512 MB per value — but if you are near that, you have modelled something wrong.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Structures 2 &amp; 3 of 5</div>
+    <h2>Hash — an object · List — a feed</h2>
+    <div class="cols">
+      <div class="box">
+        <h3>Hash</h3>
+<pre><code>HSET booking:CNR3000142
+     status "Completed"
+     vehicle_type "Go Sedan"
+HINCRBY dash:payment "UPI" 1
+HGETALL dash:payment</code></pre>
+        <p>One key, one round trip, one TTL — and a compact encoding for small hashes.</p>
+      </div>
+      <div class="box">
+        <h3>List</h3>
+<pre><code>LPUSH  feed:recent "CNR3000142 …"
+LTRIM  feed:recent 0 99
+LRANGE feed:recent 0 9
+RPOP   queue:driver_payouts</code></pre>
+        <p>O(1) at the ends, not the middle. A queue or a recent-activity strip — never an array.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Memorise:</strong> <code>LPUSH</code> + <code>LTRIM</code> = a feed that can never grow without bound.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Structure 4 of 5</div>
+    <h2>Set — uniqueness is free</h2>
+<pre><code>SADD    customers:2024-03-14 "CID482910"
+SADD    customers:2024-03-14 "CID482910"   # -&gt; 0, already there
+SCARD   customers:2024-03-14               # unique customers that day
+
+SINTER  customers:2024-03-13 customers:2024-03-14   # returned both days
+SUNION  customers:2024-03-13 customers:2024-03-14   # reach
+SDIFF   customers:2024-03-13 customers:2024-03-14   # churn candidates</code></pre>
+    <p>Set algebra executes <strong>inside the server</strong> — no data crosses the wire to be intersected in your application.</p>
+    <div class="box amber">
+      <h3>⚠️ The cost to watch</h3>
+      <p>A Set stores every member in full. One million <code>CID…</code> IDs ≈ <strong>60–80 MB per day, per key</strong>. Fine for two days. Ruinous for a year.</p>
+    </div>
+    <div class="note-strip">If you only need the <strong>count</strong>, there is something far cheaper — two slides away.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Structure 5 of 5</div>
+    <h2>Sorted Set — the one SQL cannot cheaply copy</h2>
+<pre><code>ZINCRBY   dash:vehicle:revenue 412.50 "Go Sedan"
+ZREVRANGE dash:vehicle:revenue 0 2 WITHSCORES
+# Premier Sedan 536855 · Go Sedan 491473 · Uber XL 431927
+
+ZINCRBY   dash:pickup:top 1 "Noida Sector 62"
+ZREVRANGE dash:pickup:top 0 4 WITHSCORES
+# Noida Sector 62 1209 · IGI Airport 1183 · NDLS 1179
+# Gurgaon Cyber City 1178 · Connaught Place 1139
+
+ZRANK dash:pickup:top "Connaught Place"    # rank of one member, O(log N)</code></pre>
+    <div class="box green">
+      <h3>Why this matters most</h3>
+      <p>"Top 10 by revenue" in SQL or a Mongo pipeline means <strong>sorting at query time, on every read</strong>. A ZSET maintains the order <strong>incrementally on write</strong> — so the read is a slice of an already-sorted structure.</p>
+    </div>
+    <div class="note-strip">Leaderboards · trending · top-N by any accumulating measure. <strong>But never rank by a <em>rate</em> without gating on volume</strong> — by failure rate 03:00 "wins" at 43.48%, on 46 bookings all year.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Cheat Sheet</div>
+    <h2>Pick the structure from the question</h2>
+    <table>
+      <thead><tr><th>Business question</th><th>Structure</th><th>Commands</th></tr></thead>
+      <tbody>
+        <tr><td>How many bookings today?</td><td>String</td><td><code>INCR</code> / <code>GET</code></td></tr>
+        <tr><td>Full state of booking CNR3000142?</td><td>Hash</td><td><code>HSET</code> / <code>HGETALL</code></td></tr>
+        <tr><td>Last 10 bookings?</td><td>List</td><td><code>LPUSH</code> / <code>LTRIM</code> / <code>LRANGE</code></td></tr>
+        <tr><td>Which customers booked? Who returned?</td><td>Set</td><td><code>SADD</code> / <code>SCARD</code> / <code>SINTER</code></td></tr>
+        <tr><td>Top vehicle by revenue? Top 5 pickups?</td><td>Sorted Set</td><td><code>ZINCRBY</code> / <code>ZREVRANGE</code></td></tr>
+        <tr><td><em>How many</em> uniques — at millions?</td><td>Bitmap / HLL</td><td><code>SETBIT</code> · <code>PFADD</code></td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip">The skill is not memorising commands. It is <strong>mapping a business question to a structure</strong> before you write a line of code.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Headline</div>
+    <h2>One bit per user. 1,000,000 users = 125 KB.</h2>
+<pre><code>SETBIT   dash:actives:2024-03-14 482910 1    # CID482910 was active
+GETBIT   dash:actives:2024-03-14 482910      # -&gt; 1
+BITCOUNT dash:actives:2024-03-14             # exact daily actives</code></pre>
+    <div class="cols">
+      <div class="box accent">
+        <div class="big-stat">125 KB</div>
+        <div class="big-stat-lbl">1,000,000 bits ÷ 8 = 125,000 bytes</div>
+      </div>
+      <div class="box">
+        <h3>Scale it out</h3>
+        <p>365 daily keys ≈ <strong>45 MB for a year</strong>. Ten million users ≈ 1.25 MB/day, ~456 MB/year. Numbers you can put in a budget.</p>
+      </div>
+    </div>
+    <p>The same million customers as a <strong>Set</strong> of <code>CID…</code> strings: 60–80 MB <em>per day</em> — hundreds of times larger.</p>
+    <div class="note-strip">A bitmap stores a <strong>yes/no fact about a known population</strong>, not the identifiers. <code>CID482910</code> → offset <code>482910</code>, free of charge.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">The Key Idea for Lecture 18</div>
+    <h2>Retention in two commands</h2>
+<pre><code># Customers active on BOTH 13 and 14 March
+BITOP AND dash:retained:0313-0314 dash:actives:2024-03-13 dash:actives:2024-03-14
+BITCOUNT  dash:retained:0313-0314
+
+# Reach across either day
+BITOP OR  dash:reach:0313-0314 dash:actives:2024-03-13 dash:actives:2024-03-14</code></pre>
+    <div class="box green">
+      <h3>What just happened</h3>
+      <p>A bitwise AND over <strong>125 KB</strong> of memory — the CPU handles <strong>64 users per machine word</strong>. In MongoDB the same cohort is a <code>$lookup</code> and <code>$group</code> over millions of documents.</p>
+    </div>
+    <div class="box amber">
+      <h3>⚠️ The precondition, honestly</h3>
+      <p>You need a <strong>dense, stable integer identity</strong> per user. UUID systems must keep an ID→offset map. Bitmap size is set by the <em>largest</em> offset. <strong>Never hash a UUID into an offset</strong> — collisions silently corrupt the count.</p>
+    </div>
+    <div class="note-strip">This is the idea the entire Lecture 18 dashboard is built on.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">When You Cannot Assign Offsets</div>
+    <h2>HyperLogLog — 12 KB, always</h2>
+<pre><code>PFADD   dash:hll:2024-03-14 "CID482910" "CID991044"
+PFCOUNT dash:hll:2024-03-14                      # ≈ distinct count
+PFMERGE dash:hll:week:11 dash:hll:2024-03-11 dash:hll:2024-03-12   # union</code></pre>
+    <table>
+      <thead><tr><th></th><th>Set</th><th>Bitmap</th><th>HyperLogLog</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Memory @ 1M</strong></td><td>~60–80 MB</td><td>~125 KB</td><td><strong>12 KB fixed</strong></td></tr>
+        <tr><td><strong>Accuracy</strong></td><td>Exact</td><td>Exact</td><td>~0.81% std error</td></tr>
+        <tr><td><strong>List members?</strong></td><td>Yes</td><td>Yes</td><td><strong>Never</strong></td></tr>
+        <tr><td><strong>Needs int IDs?</strong></td><td>No</td><td>Yes</td><td>No</td></tr>
+        <tr><td><strong>Combine</strong></td><td><code>SINTER</code>/<code>SUNION</code></td><td><code>BITOP</code> AND/OR/XOR</td><td><code>PFMERGE</code> (union only)</td></tr>
+      </tbody>
+    </table>
+    <div class="note-strip"><strong>The trade in business terms:</strong> "1,000,000 visitors" really means ~991,900–1,008,100. Fine for a board-pack chart. <strong>Unusable for billing.</strong></div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Governance</div>
+    <h2>No schema means the key names ARE the schema</h2>
+<pre><code>&lt;namespace&gt;:&lt;entity&gt;:&lt;identifier&gt;:&lt;attribute&gt;
+
+rides:2024-03-14:completed      dash:actives:2024-03-14
+dash:vehicle:revenue            booking:CNR3000142</code></pre>
+    <p>One separator. <strong>ISO dates</strong>, so keys sort chronologically. A prefix that names the owning feature. And the schema <strong>written down in a table</strong> — nobody can derive it from the server.</p>
+<pre><code>EXPIRE dash:actives:2024-03-14 7776000   # 90 days — set it at write time
+TTL    dash:actives:2024-03-14           # -1 = no expiry, -2 = no key
+CONFIG SET maxmemory-policy volatile-lru # evict LRU only among TTL'd keys</code></pre>
+    <div class="cols">
+      <div class="box amber">
+        <h3>⚠️ Never <code>KEYS *</code> in production</h3>
+        <p>O(N) over the whole keyspace, and single-threaded means it <strong>blocks every other client</strong>. A total outage caused by someone looking around. Use <code>SCAN 0 MATCH dash:* COUNT 100</code>.</p>
+      </div>
+      <div class="box">
+        <h3>Eviction policies</h3>
+        <p><code>noeviction</code> (default — writes fail) · <code>allkeys-lru</code> (pure cache) · <code>volatile-lru</code> (<strong>our pattern</strong> — aggregates protected, cached payloads expendable) · <code>volatile-ttl</code> (sessions).</p>
+      </div>
+    </div>
+    <div class="note-strip">A cache without an eviction policy is not a cache — it is an <strong>unbounded memory leak</strong>. The policy states which data you are willing to lose first.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Durability &amp; Limits</div>
+    <h2>RDB vs AOF — and three wrong answers</h2>
+    <table>
+      <thead><tr><th></th><th>RDB snapshot</th><th>AOF append-only log</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Worst-case loss</strong></td><td>Everything since last snapshot — minutes</td><td>~1 s (<code>everysec</code>); ~0 (<code>always</code>)</td></tr>
+        <tr><td><strong>Write cost</strong></td><td>~0, plus a fork spike</td><td>Continuous; <code>always</code> waits on <code>fsync</code></td></tr>
+        <tr><td><strong>Restart</strong></td><td>Fast binary load</td><td>Slower log replay</td></tr>
+      </tbody>
+    </table>
+    <div class="cols">
+      <div class="box amber">
+        <h3>❌ Wrong answer when…</h3>
+        <p>It is the <strong>primary store for data you cannot lose</strong>; the dataset is <strong>larger than RAM</strong> (memory costs ~10× SSD); or you need <strong>complex ad-hoc queries</strong>.</p>
+      </div>
+      <div class="box green">
+        <h3>✅ Right answer when…</h3>
+        <p>The access pattern is known in advance, read volume is high, the latency budget is tight, and the data is <strong>derived or reconstructible</strong>.</p>
+      </div>
+    </div>
+    <div class="note-strip"><strong>Redis can lose the last few seconds of writes.</strong> Irrelevant for a speed layer. Disqualifying for a ledger. Same property — opposite verdict.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Lab · 12 minutes</div>
+    <h2>Run it. Touch every structure.</h2>
+<pre><code>docker run -d --name bdma-redis -p 6379:6379 redis:7-alpine
+docker exec -it bdma-redis redis-cli
+PING                                   # -&gt; PONG
+
+HINCRBY   dash:payment "UPI" 6755
+ZINCRBY   dash:vehicle:revenue 536855 "Premier Sedan"
+ZREVRANGE dash:vehicle:revenue 0 2 WITHSCORES
+
+SETBIT    dash:actives:2024-03-13 482910 1
+SETBIT    dash:actives:2024-03-14 482910 1
+SETBIT    dash:actives:2024-03-14 991044 1
+BITOP AND dash:retained dash:actives:2024-03-13 dash:actives:2024-03-14
+BITCOUNT  dash:retained                # -&gt; 1
+MEMORY USAGE dash:actives:2024-03-14   # ≈ 124 KB — and it would be the
+                                       # same at a million customers</code></pre>
+    <div class="note-strip"><strong>Leave the container running.</strong> Lecture 18 writes into this exact server. No Docker? Redis Cloud free tier, 30 MB — credentials in <code>.env</code>, never committed.</div>
+  </section>
+
+  <section class="slide">
+    <div class="slide-kicker">Wrap-Up</div>
+    <h2>Six things to carry forward</h2>
+    <ol>
+      <li><strong>Polyglot persistence is an architecture.</strong> Mongo is the system of record; Redis holds derived answers — which is why losing it is survivable.</li>
+      <li><strong>The case is arithmetic.</strong> RAM ~100 ns · SSD ~100 µs · DB round trip ~1–10 ms · human "instant" ~100 ms.</li>
+      <li><strong>Single-threaded is a feature.</strong> No locks, no contention, every command atomic.</li>
+      <li><strong>The values are data structures.</strong> Strings, Hashes, Lists, Sets — and Sorted Sets, which SQL cannot copy cheaply.</li>
+      <li><strong>One bit per user.</strong> 1,000,000 ÷ 8 = 125 KB. <code>BITOP AND</code> + <code>BITCOUNT</code> = retention in two commands.</li>
+      <li><strong>The key naming convention IS the schema.</strong> Colon namespaces, ISO dates, TTL at write time, explicit eviction policy, <code>SCAN</code> not <code>KEYS</code>.</li>
+    </ol>
+    <div class="note-strip"><strong>Next — Lecture 18:</strong> build the live dashboard. Node writer, Express API, bitmaps for retention — and one reversal: <strong>compute on write, not on read.</strong></div>
+  </section>
+
+</div>
+
+<div class="deck-hint">← → or Space to navigate · F for fullscreen</div>
+<script src="../assets/js/slides.js"></script>
+</body>
+</html>

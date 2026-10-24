@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture 17 — Redis &amp; the Key-Value Model | BDMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/notes.css" />
+  <script src="../assets/js/theme.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-left">
+    <a href="../index.html" class="nav-home">← Course Home</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Lecture 17 — Notes</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge">Module 4</span>
+    <a href="index.html" class="nav-slides">▶ Slides</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">☀️</span><span id="themeLabel">Light</span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="lec-label">Module 4 · Lecture 17</div>
+  <h1>Redis &amp; the Key-Value Model</h1>
+  <p class="subtitle">The speed layer — why a second database earns its place, and how rich values turn a cache into an analytics engine</p>
+  <div class="meta-row">
+    <span>⏱ <strong>90 minutes</strong></span>
+    <span>🎯 <strong>CLO3</strong></span>
+    <span>📍 <strong>Prerequisites:</strong> Lectures 11–16 (NoSQL families, MongoDB, Atlas Charts dashboard)</span>
+    <span>🔧 <strong>Lab:</strong> Redis 7 in Docker + <code>redis-cli</code></span>
+  </div>
+
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#objectives">Learning Objectives</a></li>
+      <li><a href="#timeline">Session Timeline</a></li>
+      <li><a href="#why">Why a Second Database — Polyglot Persistence</a></li>
+      <li><a href="#model">What Redis Actually Is</a></li>
+      <li><a href="#structures">The Five Core Data Structures</a></li>
+      <li><a href="#counting">Counting at Scale — Bitmaps and HyperLogLog</a></li>
+      <li><a href="#keys">Key Naming, Expiry and Eviction</a></li>
+      <li><a href="#persistence">Persistence — and When Redis Is the Wrong Answer</a></li>
+      <li><a href="#lab">Hands-On — Redis in Docker with Ride Data</a></li>
+      <li><a href="#takeaways">Key Takeaways</a></li>
+    </ol>
+  </div>
+
+  <h2 id="objectives">Learning Objectives</h2>
+  <ul class="obj-list">
+    <li><span class="check">✓</span> Justify polyglot persistence with a latency budget rather than a preference, and place Redis correctly as a speed layer beside MongoDB as the system of record</li>
+    <li><span class="check">✓</span> Explain why an in-memory, single-threaded server is a deliberate design choice and what it buys in atomicity</li>
+    <li><span class="check">✓</span> Select the right Redis data structure — String, Hash, List, Set or Sorted Set — for a stated business question and issue the correct commands</li>
+    <li><span class="check">✓</span> Compute the memory cost of a bitmap and explain why 1,000,000 daily-active flags fit in ~125 KB</li>
+    <li><span class="check">✓</span> State the HyperLogLog trade — ~0.81% error and no member listing, in a fixed 12 KB</li>
+    <li><span class="check">✓</span> Design a colon-delimited key namespace and set an appropriate <code>maxmemory-policy</code> and TTL strategy</li>
+    <li><span class="check">✓</span> Argue the RDB-versus-AOF durability trade and name three workloads where Redis is the wrong answer</li>
+  </ul>
+
+  <h2 id="timeline">Session Timeline</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Time</th><th>Segment</th><th>Activity</th></tr></thead>
+    <tbody>
+      <tr><td>0–8 min</td><td>Recap &amp; Framing</td><td>Where Module 3 left us; the dashboard question Atlas Charts answers slowly</td></tr>
+      <tr><td>8–20 min</td><td>Polyglot Persistence</td><td>The latency budget: RAM vs SSD vs network round trip; system of record vs speed layer</td></tr>
+      <tr><td>20–30 min</td><td>What Redis Is</td><td>REmote DIctionary Server; in-memory, single-threaded, rich values; Redis vs Memcached</td></tr>
+      <tr><td>30–52 min</td><td>Core Structures</td><td>String, Hash, List, Set, Sorted Set — commands and ride-analytics uses</td></tr>
+      <tr><td>52–66 min</td><td>Bitmaps &amp; HyperLogLog</td><td>The 125 KB argument; <code>BITOP</code> retention; approximate cardinality</td></tr>
+      <tr><td>66–76 min</td><td>Keys, TTL, Eviction</td><td>Namespacing as schema; <code>EXPIRE</code>, <code>SCAN</code>, <code>maxmemory-policy</code></td></tr>
+      <tr><td>76–86 min</td><td>Docker Lab</td><td>Run Redis 7, connect with <code>redis-cli</code>, work each structure on ride data</td></tr>
+      <tr><td>86–90 min</td><td>Wrap-Up</td><td>Durability trade, wrong-answer cases, Lecture 18 build brief</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="why">Section 1: Why a Second Database — Polyglot Persistence</h2>
+
+  <p>By the end of Lecture 16 you had a working analytics product: 15,000 ride bookings in MongoDB Atlas, an aggregation pipeline that computes revenue by vehicle type and failure rate by hour, and an Atlas Charts dashboard that renders the result. It is genuinely good work. It is also, for a specific class of question, the wrong machine.</p>
+
+  <p>Open that dashboard and every tile fires an aggregation pipeline. The pipeline scans, groups, sorts and returns. On 15,000 documents that is comfortably fast. On 15,000,000 — the volume a real ride-hailing firm generates in a few weeks — the same pipeline becomes a multi-second operation, and you are running it again for every analyst who refreshes the page.</p>
+
+  <div class="callout">
+    <p><strong>Polyglot persistence</strong> is the practice of running more than one database, each chosen for the job it is best at. You met the term in Lecture 11 as a myth-buster. In Module 4 it becomes an architecture: <strong>MongoDB is the system of record</strong> — the durable, queryable, auditable truth — and <strong>Redis is the speed layer</strong> — a small, volatile, extremely fast set of pre-computed answers.</p>
+  </div>
+
+  <h3>The Latency Budget</h3>
+  <p>The argument for a speed layer is not aesthetic. It is arithmetic. These are the numbers every systems architect carries in their head:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Operation</th><th>Typical Latency</th><th>Relative Cost</th><th>What It Means</th></tr></thead>
+    <tbody>
+      <tr><td>Read from RAM</td><td>~100 nanoseconds</td><td>1×</td><td>Effectively instant — the CPU barely waits</td></tr>
+      <tr><td>Read from SSD</td><td>~100 microseconds</td><td>~1,000×</td><td>Fast, but a thousand RAM reads could have happened</td></tr>
+      <tr><td>Database round trip over a network</td><td>~1–10 milliseconds</td><td>~10,000–100,000×</td><td>Query planning, disk access, serialisation, network</td></tr>
+      <tr><td>Human perception of "instant"</td><td>~100 milliseconds</td><td>—</td><td>Your entire page-load budget</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Read the last two rows together. If a dashboard page needs twelve metrics and each costs a 10 ms aggregation, you have spent 120 ms before a single pixel is drawn — you have blown the budget on data alone. If each metric is a single in-memory lookup at well under a millisecond, twelve of them cost less than one MongoDB query.</p>
+
+  <div class="callout blue">
+    <p><strong>The business translation:</strong> Amazon's often-quoted internal finding was that every additional 100 ms of latency cost roughly 1% in sales. You do not need to believe the precise figure to accept the direction. Latency is not an engineering vanity metric — it is conversion, analyst productivity, and the difference between a dashboard people check hourly and one they stopped opening.</p>
+  </div>
+
+  <h3>Division of Labour</h3>
+  <div class="panel-grid">
+    <div class="panel-card">
+      <h3>🗄️ MongoDB — System of Record</h3>
+      <p>Holds all 15,000 booking documents, permanently and durably. Answers any question you think of later, including ones nobody anticipated.</p>
+      <p style="margin-top:.5rem"><strong>Optimised for:</strong> completeness, flexibility, durability. <strong>Costs:</strong> milliseconds per query, and the query cost grows with the data.</p>
+    </div>
+    <div class="panel-card">
+      <h3>⚡ Redis — Speed Layer</h3>
+      <p>Holds a few dozen pre-computed aggregates: total bookings, revenue by vehicle, top pickup points, today's unique customers.</p>
+      <p style="margin-top:.5rem"><strong>Optimised for:</strong> read latency. <strong>Costs:</strong> you must decide in advance what to track, and losing it is survivable because it can be rebuilt from Mongo.</p>
+    </div>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The safety property that makes this architecture sane:</strong> everything in Redis is <em>derived</em>. If the Redis process dies and the memory is lost, you have lost nothing that cannot be recomputed by replaying the <code>rides</code> collection. That is precisely why a volatile store is an acceptable component — and precisely why it must never be the only copy of anything.</p>
+  </div>
+
+  <h2 id="model">Section 2: What Redis Actually Is</h2>
+
+  <p><strong>Redis</strong> stands for <strong>RE</strong>mote <strong>DI</strong>ctionary <strong>S</strong>erver. Salvatore Sanfilippo released it in 2009 after an analytics workload at his own startup proved too slow on MySQL — a lineage worth noting, because analytics is exactly what we are about to use it for.</p>
+
+  <p>Three design decisions define it.</p>
+
+  <h3>1. It Lives in RAM</h3>
+  <p>The entire dataset is held in main memory. There is no buffer pool, no cache-miss path, no "is this page on disk?" branch. Every read is a memory read. The consequence is both halves of the trade: single-digit-microsecond operations, and a hard ceiling at the size of your RAM.</p>
+
+  <h3>2. It Is Single-Threaded — Deliberately</h3>
+  <p>Command execution runs on one thread. Students usually hear this as a defect. It is the opposite.</p>
+
+  <div class="callout">
+    <p>A multi-threaded in-memory store must protect every shared structure with locks. Lock acquisition, contention, and the cache-line traffic that comes with it routinely cost more than the operation being protected. Redis removes the problem by removing concurrency: commands are executed one at a time, in arrival order, to completion.</p>
+    <p>The payoff is free atomicity. <code>INCR</code> is not "read, add one, write" with a race in the middle — it is one indivisible step. No application-level locking, no lost-update bug, no compare-and-swap retry loop. Two hundred concurrent booking events can increment the same counter and the count will be exactly right.</p>
+  </div>
+
+  <p>Modern Redis does use additional threads for I/O and for background persistence, but the command-execution model remains serial, and that is the property you reason about.</p>
+
+  <h3>3. The Values Are Data Structures — This Is the Whole Point</h3>
+  <p>This is the distinction that separates Redis from a plain cache such as Memcached, and the one most worth carrying out of this lecture.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Memcached (plain cache)</th><th>Redis (data-structure server)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Value model</strong></td><td>An opaque blob of bytes</td><td>A typed structure the server understands</td></tr>
+      <tr><td><strong>To add 1 to a counter</strong></td><td>Fetch the blob, parse it, add, serialise, write back — and race with every other client</td><td><code>INCR key</code> — one atomic server-side operation</td></tr>
+      <tr><td><strong>To keep a top-10 list</strong></td><td>Fetch everything, sort in the application, write back</td><td><code>ZINCRBY</code> then <code>ZREVRANGE key 0 9</code> — the server maintains the order</td></tr>
+      <tr><td><strong>Network cost</strong></td><td>The whole value crosses the wire on every change</td><td>Only the delta crosses the wire</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Say this precisely:</strong> Redis is a key-value store in which the value is a <em>rich data structure manipulated in place on the server</em>. That one sentence explains why a "cache" can serve as the engine of the live dashboard you will build next week.</p>
+  </div>
+
+  <h2 id="structures">Section 3: The Five Core Data Structures</h2>
+
+  <p>Every example below uses the course dataset — the <code>bdma.rides</code> collection of 15,000 Delhi-NCR Uber-style bookings from calendar 2024.</p>
+
+  <h3>String — The Counter and the Cache Slot</h3>
+  <p>A String holds text, a number, or serialised JSON, up to 512 MB. When the content is numeric, Redis can do arithmetic on it atomically.</p>
+
+  <pre><code># A plain value
+SET    rides:last_loaded "2024-12-31T23:59:59Z"
+GET    rides:last_loaded
+
+# A counter — atomic, no read-modify-write race
+INCR   rides:2024-03-14:total           # -&gt; 1, then 2, then 3 ...
+INCRBY rides:2024-03-14:completed 1
+INCRBYFLOAT revenue:2024-03-14 412.50   # booking_value is a decimal
+
+# A cached JSON payload with a 60-second life
+SETEX dash:summary:cache 60 '{"total":15000,"completed":9343}'</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Business use</th><th>Why a String</th></tr></thead>
+    <tbody>
+      <tr><td>Bookings today, completions today, cancellations today</td><td><code>INCR</code> is atomic and O(1) regardless of how many writers there are</td></tr>
+      <tr><td>Running revenue for a date</td><td><code>INCRBYFLOAT</code> accumulates <code>booking_value</code> without re-reading the total</td></tr>
+      <tr><td>Feature flags (<code>flag:surge_pricing</code> = <code>on</code>)</td><td>Read on every request; one memory lookup instead of a config query</td></tr>
+      <tr><td>Cached JSON for an expensive report</td><td><code>SETEX</code> gives automatic invalidation — the cache cannot go stale past its TTL</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Hash — An Object Under One Key</h3>
+  <p>A Hash maps field names to values inside a single key. It is the natural home for a record with several attributes that you want to update independently.</p>
+
+  <pre><code># One booking's live state
+HSET  booking:CNR3000142 status "Completed" vehicle_type "Go Sedan" \
+      pickup "Connaught Place" booking_value 412.5
+HGET  booking:CNR3000142 status            # -&gt; "Completed"
+HGETALL booking:CNR3000142                  # -&gt; every field and value
+
+# Payment-method mix, as one object rather than five keys
+HINCRBY dash:payment "UPI" 1
+HINCRBY dash:payment "Cash" 1
+HGETALL dash:payment
+# -&gt; UPI 6755, Cash 3797, Uber Wallet 1769, Credit Card 1619, Debit Card 1062</code></pre>
+
+  <div class="callout blue">
+    <p><strong>Why a Hash rather than five Strings?</strong> One key instead of five means one round trip to read the whole group (<code>HGETALL</code>), one key to expire, and markedly lower memory overhead — Redis stores small hashes in a compact encoding. Use a Hash whenever the fields are read together and belong to the same conceptual object.</p>
+  </div>
+
+  <h3>List — Ordered, with Fast Ends</h3>
+  <p>A List is a linked list of strings. Pushing and popping at either end is O(1); reading the middle is not. That shape makes it a queue or a recent-activity feed, not a general-purpose array.</p>
+
+  <pre><code>LPUSH  feed:recent_bookings "CNR3000142 · Go Sedan · Connaught Place → Aerocity"
+LPUSH  feed:recent_bookings "CNR3000143 · Auto · Noida Sector 62 → Sector 18"
+LRANGE feed:recent_bookings 0 9      # the ten most recent
+LTRIM  feed:recent_bookings 0 99     # keep only the latest 100 — bounded memory
+
+# As a work queue
+LPUSH  queue:driver_payouts "CNR3000142"
+RPOP   queue:driver_payouts          # a worker takes the oldest item</code></pre>
+
+  <p><strong>The pattern worth memorising:</strong> <code>LPUSH</code> followed by <code>LTRIM</code> gives you a feed that can never grow without limit. A recent-activity strip on a dashboard should always be capped this way.</p>
+
+  <h3>Set — Unique Membership</h3>
+  <p>An unordered collection with no duplicates. Adding a member that already exists is a no-op, which makes uniqueness free rather than something you check for.</p>
+
+  <pre><code>SADD    customers:2024-03-14 "CID482910"
+SADD    customers:2024-03-14 "CID482910"   # -&gt; 0, already present
+SCARD   customers:2024-03-14               # unique customers that day
+SISMEMBER customers:2024-03-14 "CID482910" # O(1) membership test
+
+SADD    vehicles:used:2024-03-14 "Go Sedan" "Auto" "eBike"
+SMEMBERS vehicles:used:2024-03-14</code></pre>
+
+  <p>The genuinely valuable part is set algebra, executed inside the server:</p>
+
+  <pre><code># Customers who booked on BOTH days — day-over-day retention
+SINTER customers:2024-03-13 customers:2024-03-14
+
+# Everyone who booked on either day
+SUNION customers:2024-03-13 customers:2024-03-14
+
+# Churn candidates: booked on the 13th, did not return on the 14th
+SDIFF  customers:2024-03-13 customers:2024-03-14</code></pre>
+
+  <div class="callout amber">
+    <p><strong>The cost to watch:</strong> a Set stores every member in full. One million customer IDs of the form <code>CID482910</code> is roughly 60–80 MB per day, per key. That is fine for a day or two and ruinous for a year. Section 4 shows what to use instead when you only need the <em>count</em>.</p>
+  </div>
+
+  <h3>Sorted Set (ZSET) — The One with No SQL Equivalent</h3>
+  <p>A Sorted Set is a Set in which every member also carries a numeric <strong>score</strong>, and the server permanently maintains the members in score order. Insertion, score update, and rank lookup are all O(log N).</p>
+
+  <pre><code># Accumulate revenue per vehicle type as bookings arrive
+ZINCRBY dash:vehicle:revenue 412.50 "Go Sedan"
+ZINCRBY dash:vehicle:revenue 688.00 "Premier Sedan"
+
+# Top three revenue earners, with their totals — instantly
+ZREVRANGE dash:vehicle:revenue 0 2 WITHSCORES
+# 1) "Premier Sedan"  2) "536855"
+# 3) "Go Sedan"       4) "491473"
+# 5) "Uber XL"        6) "431927"
+
+# Busiest pickup points
+ZINCRBY   dash:pickup:top 1 "Noida Sector 62"
+ZREVRANGE dash:pickup:top 0 4 WITHSCORES
+# Noida Sector 62 1209 · IGI Airport 1183 · New Delhi Railway Station 1179
+# Gurgaon Cyber City 1178 · Connaught Place 1139
+
+ZRANK   dash:pickup:top "Connaught Place"   # ascending rank
+ZSCORE  dash:pickup:top "IGI Airport"       # -&gt; 1183
+ZRANGEBYSCORE dash:vehicle:revenue 400000 +inf</code></pre>
+
+  <div class="callout green">
+    <p><strong>Why this one matters most.</strong> "Give me the top 10 by revenue" in SQL or a MongoDB pipeline means sorting the aggregate at query time — work proportional to the number of groups, repeated on every read. In a ZSET the ordering is maintained incrementally on write, so the read is a slice of an already-sorted structure. Leaderboards, trending lists, top-N by any accumulating measure, and rank-of-one-item queries are the cases where Redis is not merely faster but structurally better suited.</p>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The trap inside every leaderboard.</strong> A ZSET ranks by whatever score you put in it and has no idea whether that score deserves to be trusted. Rank the 24 hours of our dataset by <em>failure rate</em> and 03:00 comes top at 43.48% — on 46 bookings for the whole year. That is a small-sample artifact, not a signal, and acting on it sends an operations team to investigate an hour that barely exists. The worst failure rate among the hours that actually carry volume is 17:00 at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062.</p>
+    <p style="margin-top:.5rem"><strong>The rule: never rank by a ratio without gating on its denominator.</strong> In MongoDB that gate is one stage — <code>{ $match: { bookings: { $gte: 1000 } } }</code> after the <code>$group</code>. In Redis there is no such stage, so you must keep the denominator in a second structure and filter in application code before you display. Same discipline, and it is now <em>your</em> job rather than the query engine's.</p>
+  </div>
+
+  <h3>Choosing Between Them</h3>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Question</th><th>Structure</th><th>Commands</th></tr></thead>
+    <tbody>
+      <tr><td>How many bookings today?</td><td>String</td><td><code>INCR</code> / <code>GET</code></td></tr>
+      <tr><td>What is the full state of booking CNR3000142?</td><td>Hash</td><td><code>HSET</code> / <code>HGETALL</code></td></tr>
+      <tr><td>What were the last 10 bookings?</td><td>List</td><td><code>LPUSH</code> / <code>LTRIM</code> / <code>LRANGE</code></td></tr>
+      <tr><td>Which customers booked today? Who returned?</td><td>Set</td><td><code>SADD</code> / <code>SCARD</code> / <code>SINTER</code></td></tr>
+      <tr><td>Which vehicle type earns most? Top 5 pickups?</td><td>Sorted Set</td><td><code>ZINCRBY</code> / <code>ZREVRANGE … WITHSCORES</code></td></tr>
+      <tr><td><em>How many</em> unique customers were active — millions of them?</td><td>Bitmap or HyperLogLog</td><td><code>SETBIT</code> / <code>BITCOUNT</code> · <code>PFADD</code> / <code>PFCOUNT</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="counting">Section 4: Counting at Scale — Bitmaps and HyperLogLog</h2>
+
+  <p>This section is the hinge of Module 4. Everything you build in Lecture 18 rests on it.</p>
+
+  <h3>Bitmaps — One Bit per User</h3>
+  <p>A Bitmap is not a separate type. It is a String addressed one bit at a time. <code>SETBIT key offset 1</code> turns on the bit at a given position, growing the underlying string as needed.</p>
+
+  <p>Map each customer to a stable numeric offset. Our IDs make this trivial: <code>CID482910</code> → offset <code>482910</code>.</p>
+
+  <pre><code># Customer CID482910 was active on 14 March
+SETBIT dash:customers:2024-03-14 482910 1
+
+# Was a specific customer active?
+GETBIT dash:customers:2024-03-14 482910    # -&gt; 1
+
+# How many distinct customers were active that day?
+BITCOUNT dash:customers:2024-03-14         # exact, server-side popcount</code></pre>
+
+  <h4>The Memory Arithmetic — Do This on the Board</h4>
+  <div class="callout">
+    <p>One bit per user. One million users is <strong>1,000,000 bits</strong>.</p>
+    <p>1,000,000 ÷ 8 = <strong>125,000 bytes ≈ 125 KB</strong>.</p>
+    <p>Tracking whether each of a million customers was active today costs about as much memory as a single photograph. A year of daily keys — 365 of them — is roughly <strong>45 MB</strong>. For ten million users it is 1.25 MB per day and about 456 MB per year. These are numbers you can put in a budget.</p>
+  </div>
+
+  <p>Compare that with the Set from Section 3. The same one million customers stored as full <code>CID…</code> strings is of the order of 60–80 MB <em>per day</em> — several hundred times larger. The bitmap wins because it stores a <em>yes/no fact about a known population</em> rather than the identifiers themselves.</p>
+
+  <h4>BITOP — Retention in Two Commands</h4>
+  <pre><code># Customers active on BOTH 13 and 14 March
+BITOP AND dash:retained:0313-0314 dash:customers:2024-03-13 dash:customers:2024-03-14
+BITCOUNT  dash:retained:0313-0314       # -&gt; day-over-day returning customers
+
+# Active on EITHER day (reach)
+BITOP OR  dash:reach:0313-0314 dash:customers:2024-03-13 dash:customers:2024-03-14
+BITCOUNT  dash:reach:0313-0314
+
+# Churned: active on the 13th but not the 14th
+BITOP NOT dash:inactive:0314 dash:customers:2024-03-14
+BITOP AND dash:churn:0313    dash:customers:2024-03-13 dash:inactive:0314
+BITCOUNT  dash:churn:0313</code></pre>
+
+  <div class="callout green">
+    <p><strong>Why this is remarkable:</strong> <code>BITOP AND</code> across a million users is a bitwise AND over 125 KB of memory — the CPU processes 64 users per machine word. A retention cohort that would be a <code>$lookup</code>-and-<code>$group</code> pipeline over millions of documents in MongoDB becomes two commands and sub-millisecond work here. <strong>This is the single idea the Lecture 18 dashboard is built on.</strong></p>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>The precondition, stated honestly:</strong> bitmaps require a dense, stable integer identity per user. <code>CID482910</code> gives us one for free. Real systems with UUID keys must maintain a separate ID → offset mapping (often a Redis Hash plus an <code>INCR</code> counter). And the bitmap's size is set by the <em>largest</em> offset used, so sparse, very large IDs waste memory. Never hash a UUID into an offset — collisions silently corrupt the count.</p>
+  </div>
+
+  <h3>HyperLogLog — Approximate Cardinality in Fixed Memory</h3>
+  <p>When you cannot assign offsets, or the population is unbounded, HyperLogLog counts distinct items in a <strong>fixed 12 KB</strong>, regardless of whether you feed it a thousand items or a billion.</p>
+
+  <pre><code>PFADD   dash:hll:customers:2024-03-14 "CID482910" "CID100233" "CID775012"
+PFCOUNT dash:hll:customers:2024-03-14        # approximate distinct count
+
+# Weekly uniques — merge seven daily keys, no double counting
+PFMERGE dash:hll:week:11 dash:hll:customers:2024-03-11 dash:hll:customers:2024-03-12 \
+        dash:hll:customers:2024-03-13 dash:hll:customers:2024-03-14
+PFCOUNT dash:hll:week:11</code></pre>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Set</th><th>Bitmap</th><th>HyperLogLog</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Memory for 1M users</strong></td><td>~60–80 MB</td><td>~125 KB</td><td>12 KB (fixed, always)</td></tr>
+      <tr><td><strong>Accuracy</strong></td><td>Exact</td><td>Exact</td><td>~0.81% standard error</td></tr>
+      <tr><td><strong>Can list members?</strong></td><td>Yes</td><td>Yes, by scanning bits</td><td><strong>No</strong> — never</td></tr>
+      <tr><td><strong>Needs integer IDs?</strong></td><td>No</td><td>Yes</td><td>No</td></tr>
+      <tr><td><strong>Combine keys</strong></td><td><code>SINTER</code>, <code>SUNION</code>, <code>SDIFF</code></td><td><code>BITOP AND/OR/XOR/NOT</code></td><td><code>PFMERGE</code> (union only)</td></tr>
+      <tr><td><strong>Use when</strong></td><td>You need the actual members</td><td>Dense integer IDs; you need intersections</td><td>Huge or unbounded keyspace; a 1% error is immaterial</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>The trade, in business language:</strong> HyperLogLog reports 1,000,000 unique visitors when the truth is somewhere around 991,900 to 1,008,100. For a traffic chart in a board pack, that is indistinguishable from exact. For "how many customers do we bill this month", it is unusable. Approximation is a <em>decision about the question</em>, not about the technology — and you should make it explicitly, in front of the person who consumes the number.</p>
+  </div>
+
+  <h2 id="keys">Section 5: Key Naming, Expiry and Eviction</h2>
+
+  <h3>The Key Naming Convention IS the Schema</h3>
+  <p>Redis has no tables, no columns, and no catalogue. Nothing stops you creating <code>x1</code>, <code>temp</code>, and <code>revenue_final_v2_USE_THIS</code> side by side. Six months later nobody — including you — knows what is in the database.</p>
+
+  <p>The universal convention is a colon-delimited hierarchy, read left to right from broadest to narrowest:</p>
+
+  <pre><code>&lt;namespace&gt;:&lt;entity&gt;:&lt;identifier&gt;:&lt;attribute&gt;
+
+rides:2024-03-14:completed          # String  — completed bookings on a date
+dash:actives:2024-03-14             # Bitmap  — daily-active customer flags
+dash:vehicle:revenue                # ZSET    — revenue by vehicle type
+dash:payment                        # Hash    — booking count per payment method
+booking:CNR3000142                  # Hash    — one booking's live state
+session:CID482910                   # Hash    — a customer's app session</code></pre>
+
+  <div class="callout">
+    <p><strong>Four rules worth enforcing in code review:</strong></p>
+    <p>1. Pick one separator — <code>:</code> — and never mix in <code>_</code> or <code>-</code> at the hierarchy level. 2. Put the date in ISO form (<code>2024-03-14</code>) so keys sort lexicographically into chronological order. 3. Make the prefix identify the owning feature (<code>dash:</code>), so one team's keys can be found, expired, or migrated without touching another's. 4. Write the key schema down in a table — it is documentation nobody can derive from the server.</p>
+  </div>
+
+  <div class="callout amber">
+    <p><strong>Never run <code>KEYS *</code> on a production server.</strong> It is O(N) over the entire keyspace, and because Redis is single-threaded it <em>blocks every other client</em> until it finishes. On a few million keys that is seconds of a total outage, caused by someone looking around. Use <code>SCAN</code>, which returns a cursor and a small batch, letting other commands interleave:</p>
+  </div>
+
+  <pre><code># Wrong — blocks the whole server
+KEYS dash:*
+
+# Right — incremental, non-blocking
+SCAN 0 MATCH dash:customers:* COUNT 100
+# -&gt; returns a new cursor plus up to ~100 keys; repeat until the cursor is 0</code></pre>
+
+  <h3>Expiry — Memory That Cleans Itself</h3>
+  <pre><code>EXPIRE dash:customers:2024-03-14 7776000   # keep 90 days (in seconds)
+TTL    dash:customers:2024-03-14           # -&gt; seconds remaining
+TTL    dash:vehicle:revenue                # -&gt; -1, no expiry set
+TTL    missing:key                         # -&gt; -2, key does not exist
+PERSIST dash:customers:2024-03-14          # remove the expiry
+SETEX  dash:summary:cache 60 "{...}"       # set value and TTL in one step</code></pre>
+
+  <p>Expiry is how a speed layer stays small. Daily keys that nobody will query after a quarter should carry a 90-day TTL from the moment they are created — set it in the same transaction as the first write, not in a cleanup job you will forget to run.</p>
+
+  <h3>Eviction — What Happens When RAM Runs Out</h3>
+  <p>Suppose memory fills anyway. Redis's behaviour is governed by <code>maxmemory</code> and <code>maxmemory-policy</code>:</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Policy</th><th>Behaviour When Full</th><th>Right For</th></tr></thead>
+    <tbody>
+      <tr><td><code>noeviction</code></td><td>Writes fail with an error; reads keep working</td><td><strong>The default.</strong> Correct when every key matters and silent data loss is unacceptable</td></tr>
+      <tr><td><code>allkeys-lru</code></td><td>Evicts the least recently used key, whether or not it has a TTL</td><td>A pure cache where anything can be rebuilt from the source of truth</td></tr>
+      <tr><td><code>volatile-lru</code></td><td>Evicts the least recently used key <em>among those with a TTL</em>; keys without one are protected</td><td>Mixed workloads — the pattern our dashboard uses</td></tr>
+      <tr><td><code>allkeys-lfu</code></td><td>Evicts the least <em>frequently</em> used key</td><td>Caches with a stable hot set and occasional one-off scans</td></tr>
+      <tr><td><code>volatile-ttl</code></td><td>Evicts the key with the nearest expiry first</td><td>Short-lived session or token stores</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>CONFIG SET maxmemory 512mb
+CONFIG SET maxmemory-policy volatile-lru
+INFO memory          # used_memory_human, maxmemory_policy, evicted_keys</code></pre>
+
+  <div class="callout blue">
+    <p><strong>Why a cache needs an eviction policy at all:</strong> a cache without one is not a cache — it is an unbounded memory leak that eventually takes the process down. The policy is the explicit statement of which data you are willing to lose first. Choosing it is a business decision disguised as a config line: <code>volatile-lru</code> says "my dashboard aggregates are protected; my cached report payloads are expendable."</p>
+  </div>
+
+  <h2 id="persistence">Section 6: Persistence — and When Redis Is the Wrong Answer</h2>
+
+  <h3>RDB Snapshots vs AOF</h3>
+  <p>Redis is in-memory, not memory-only. It offers two ways to put data on disk, and they trade durability against write cost in opposite directions.</p>
+
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>RDB — Snapshot</th><th>AOF — Append-Only File</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Mechanism</strong></td><td>Forks a child process that writes a point-in-time binary dump of the whole dataset</td><td>Appends every write command to a log, which is replayed on restart</td></tr>
+      <tr><td><strong>Worst-case loss</strong></td><td>Everything since the last snapshot — minutes</td><td>About one second with <code>appendfsync everysec</code>; near-zero with <code>always</code></td></tr>
+      <tr><td><strong>Write-path cost</strong></td><td>Near zero between snapshots; a CPU and memory spike during the fork</td><td>Continuous, modest; <code>always</code> makes every write wait on <code>fsync</code></td></tr>
+      <tr><td><strong>Restart speed</strong></td><td>Fast — load a compact binary file</td><td>Slower — replay the log (mitigated by periodic rewrites)</td></tr>
+      <tr><td><strong>File size</strong></td><td>Compact</td><td>Larger; needs background rewriting to stay bounded</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code># Snapshot if 1 change in 900s, 10 in 300s, or 10,000 in 60s
+CONFIG SET save "900 1 300 10 60 10000"
+
+# Enable the append-only log, flushed once per second
+CONFIG SET appendonly yes
+CONFIG SET appendfsync everysec
+
+BGSAVE       # take a snapshot now, in the background
+LASTSAVE     # Unix timestamp of the last successful snapshot</code></pre>
+
+  <div class="callout amber">
+    <p><strong>The sentence to remember:</strong> Redis can lose the last few seconds of writes. For a speed layer that is irrelevant — the aggregates are derived and can be rebuilt by replaying <code>bdma.rides</code>. For a payment ledger it is disqualifying. <em>The same property is acceptable or fatal depending entirely on what the data is.</em> That judgement, not the config syntax, is what an MBA is paid for.</p>
+  </div>
+
+  <h3>Three Cases Where Redis Is the Wrong Answer</h3>
+  <div class="panel-grid">
+    <div class="panel-card">
+      <h3>❌ Primary store for data you cannot lose</h3>
+      <p>Bookings, payments, contracts, audit trails. Even with AOF <code>always</code>, you are paying a durability premium on a system designed for the opposite trade. Use PostgreSQL or MongoDB.</p>
+    </div>
+    <div class="panel-card">
+      <h3>❌ Datasets larger than RAM</h3>
+      <p>Redis is priced per gigabyte of memory, which costs roughly an order of magnitude more than SSD. A 2 TB dataset in Redis is an architectural error with an invoice attached.</p>
+    </div>
+    <div class="panel-card">
+      <h3>❌ Complex ad-hoc queries</h3>
+      <p>There is no "WHERE booking_value &gt; 500 AND vehicle_type = 'Auto'" unless you built that index yourself. Exploratory analysis belongs in the system of record.</p>
+    </div>
+  </div>
+
+  <div class="callout green">
+    <p><strong>The decision rule:</strong> use Redis when the access pattern is known in advance, the read volume is high, the latency budget is tight, and the data is derived or reconstructible. Fail any one of those and you want a different store — most often the one you already have.</p>
+  </div>
+
+  <h2 id="lab">Section 7: Hands-On — Redis in Docker with Ride Data</h2>
+
+  <p>Twelve minutes. Everyone gets a running server and touches every structure from Section 3.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><p>Start Redis 7. The Alpine image is about 40 MB and starts in under a second.</p>
+    <pre><code>docker run -d --name bdma-redis -p 6379:6379 redis:7-alpine
+docker ps            # confirm the container is Up</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><p>Open an interactive client inside the container and check the connection.</p>
+    <pre><code>docker exec -it bdma-redis redis-cli
+127.0.0.1:6379&gt; PING
+PONG</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><p><strong>Strings.</strong> Load the day's verified counts and a running revenue total.</p>
+    <pre><code>SET  rides:2024:total 15000
+SET  rides:2024:completed 9343
+INCRBYFLOAT revenue:2024-03-14 412.50
+INCRBYFLOAT revenue:2024-03-14 688.00
+GET  revenue:2024-03-14          # -&gt; "1100.5"</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><p><strong>Hash.</strong> Build the payment-method mix, then read it back in one call.</p>
+    <pre><code>HINCRBY dash:payment "UPI" 6755
+HINCRBY dash:payment "Cash" 3797
+HINCRBY dash:payment "Uber Wallet" 1769
+HINCRBY dash:payment "Credit Card" 1619
+HINCRBY dash:payment "Debit Card" 1062
+HGETALL dash:payment</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><p><strong>Sorted Set.</strong> Revenue by vehicle type and the top pickup points — the two ZSETs you will reuse next week.</p>
+    <pre><code>ZINCRBY dash:vehicle:revenue 536855 "Premier Sedan"
+ZINCRBY dash:vehicle:revenue 491473 "Go Sedan"
+ZINCRBY dash:vehicle:revenue 431927 "Uber XL"
+ZREVRANGE dash:vehicle:revenue 0 2 WITHSCORES
+
+ZINCRBY dash:pickup:top 1209 "Noida Sector 62"
+ZINCRBY dash:pickup:top 1183 "IGI Airport"
+ZINCRBY dash:pickup:top 1179 "New Delhi Railway Station"
+ZINCRBY dash:pickup:top 1178 "Gurgaon Cyber City"
+ZINCRBY dash:pickup:top 1139 "Connaught Place"
+ZREVRANGE dash:pickup:top 0 4 WITHSCORES
+ZRANK     dash:pickup:top "Connaught Place"</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body"><p><strong>Set and List.</strong> Unique customers, set intersection, and a capped activity feed.</p>
+    <pre><code>SADD customers:2024-03-13 "CID482910" "CID100233" "CID775012"
+SADD customers:2024-03-14 "CID482910" "CID991044"
+SCARD  customers:2024-03-14      # -&gt; 2
+SINTER customers:2024-03-13 customers:2024-03-14   # -&gt; "CID482910"
+
+LPUSH  feed:recent "CNR3000142 · Go Sedan · Connaught Place → Aerocity"
+LPUSH  feed:recent "CNR3000143 · Auto · Noida Sector 62 → Sector 18"
+LTRIM  feed:recent 0 99
+LRANGE feed:recent 0 4</code></pre></div>
+  </div>
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body"><p><strong>Bitmaps.</strong> The headline result — flag two customers across two days and compute retention.</p>
+    <pre><code>SETBIT dash:actives:2024-03-13 482910 1
+SETBIT dash:actives:2024-03-13 100233 1
+SETBIT dash:actives:2024-03-14 482910 1
+SETBIT dash:actives:2024-03-14 991044 1
+
+BITCOUNT dash:actives:2024-03-14          # -&gt; 2
+BITOP AND dash:retained dash:actives:2024-03-13 dash:actives:2024-03-14
+BITCOUNT dash:retained                    # -&gt; 1 (CID482910 returned)
+
+MEMORY USAGE dash:actives:2024-03-14      # bytes — compare with the Set above</code></pre>
+    <p style="margin-top:.5rem">Note the memory figure. With offsets up to ~991,044 the key occupies roughly 124 KB — and it would occupy the same 124 KB if all one million customers were flagged.</p></div>
+  </div>
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body"><p><strong>Expiry and HyperLogLog.</strong> Then leave the container running — Lecture 18 writes into this same server.</p>
+    <pre><code>EXPIRE dash:actives:2024-03-14 7776000
+TTL    dash:actives:2024-03-14
+
+PFADD   dash:hll:2024-03-14 "CID482910" "CID991044" "CID482910"
+PFCOUNT dash:hll:2024-03-14      # -&gt; 2
+
+INFO keyspace
+# To stop and remove later:  docker stop bdma-redis &amp;&amp; docker rm bdma-redis</code></pre></div>
+  </div>
+
+  <div class="callout blue">
+    <p><strong>If Docker is unavailable:</strong> Redis Cloud offers a free 30 MB tier at <a href="https://redis.com/try-free/" target="_blank" rel="noopener">redis.com/try-free</a>. Thirty megabytes is ample for this course. Connect with <code>redis-cli -h &lt;host&gt; -p &lt;port&gt; -a &lt;password&gt;</code>, and keep the credentials in a local <code>.env</code> file — never in a committed source file.</p>
+  </div>
+
+  <h2 id="takeaways">Key Takeaways</h2>
+  <div class="takeaway-box">
+    <h3>✓ What You Should Be Able to Say After This Session</h3>
+    <ol>
+      <li><strong>Polyglot persistence is an architecture, not a slogan.</strong> MongoDB is the system of record; Redis is the speed layer holding derived answers. Because Redis data is derived, losing it is survivable — which is what makes a volatile store acceptable in production.</li>
+      <li><strong>The case for a speed layer is arithmetic.</strong> RAM ~100 ns, SSD ~100 µs, a network database round trip ~1–10 ms. A twelve-tile dashboard cannot afford twelve aggregations inside a 100 ms budget.</li>
+      <li><strong>Single-threaded is a feature.</strong> No locks, no contention, and every command is atomic — so concurrent writers can increment the same counter and still be exactly right.</li>
+      <li><strong>The values are data structures, and that is the whole point.</strong> Strings for counters, Hashes for objects, Lists for feeds, Sets for uniqueness and set algebra, Sorted Sets for ranked top-N — the last of which SQL cannot replicate cheaply.</li>
+      <li><strong>One bit per user changes what is affordable.</strong> 1,000,000 bits ÷ 8 = 125 KB for a day of active flags; <code>BITOP AND</code> plus <code>BITCOUNT</code> turns a retention cohort into two commands. HyperLogLog trades exactness and member listing for a fixed 12 KB at ~0.81% error.</li>
+      <li><strong>No schema means the key naming convention IS the schema.</strong> Colon-delimited namespaces, ISO dates, TTLs set at write time, an explicit <code>maxmemory-policy</code> — and <code>SCAN</code>, never <code>KEYS *</code>, on anything that matters.</li>
+    </ol>
+  </div>
+
+  <div class="preview-box">
+    <h3>→ Next: Lecture 18 — Building a Real-Time Analytics Dashboard with Redis</h3>
+    <p>A build session. You will write a Node.js writer that updates Redis counters, sorted sets and bitmaps atomically on every incoming booking, an Express API that assembles the dashboard payload in a handful of O(1) reads, and a browser view that polls it. The central idea is a reversal of everything you did in Module 3: <strong>compute on write, not on read.</strong> Bring your running <code>bdma-redis</code> container and Node 18+.</p>
+  </div>
+
+  <div class="page-nav">
+    <a href="../lecture16/notes.html">← Lecture 16</a>
+    <span class="spacer"></span>
+    <a href="index.html">▶ Slides</a>
+    <a href="../lecture18/notes.html">Lecture 18 →</a>
+  </div>
+</div>
+
+<footer>
+  <p>Big Data Management &amp; Analytics · MBA Elective &nbsp;|&nbsp; <a href="../index.html">Course Home</a> &nbsp;·&nbsp; <a href="../assignments.html">Assignments</a> &nbsp;·&nbsp; <a href="https://github.com/aditya-dua/BDMA">GitHub</a></p>
+</footer>
+</body>
+</html>
