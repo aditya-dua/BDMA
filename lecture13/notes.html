@@ -662,7 +662,8 @@ db.rides.countDocuments({ segment: { $exists: true } })        // expect 0</code
 
   <div class="preview-box">
     <h3>→ Next: Lecture 14 — The Aggregation Framework</h3>
-    <p><code>find</code> retrieves documents; it cannot compute. To produce "average fare by vehicle type", "revenue per payment method", or "failure rate by hour of day" you need the aggregation pipeline — <code>$match</code>, <code>$group</code>, <code>$sort</code>, <code>$project</code>, <code>$unwind</code> and <code>$lookup</code> composed in stages. That is where the ₹22,02,449, the 10.87 km average, and the 39.92% failure rate at 17:00 stop being numbers we told you and start being numbers you derive.</p>
+    <p><code>find</code> retrieves documents; it cannot compute. To produce "average fare by vehicle type", "revenue per payment method", or "failure rate by hour of day" you need the aggregation pipeline — <code>$match</code>, <code>$group</code>, <code>$sort</code>, <code>$project</code>, <code>$unwind</code> and <code>$lookup</code> composed in stages. That is where ₹22,02,449 and the 10.87 km average stop being numbers we told you and start being numbers you derive.</p>
+    <p>It is also where you meet the first real analytical trap. Rank the 24 hours of the day by failure rate and 03:00 comes top at 43.48% — on 46 bookings. That is a small-sample artifact, and acting on it sends an operations team chasing noise at three in the morning. Put a <code>{ $match: { bookings: { $gte: 1000 } } }</code> after the <code>$group</code> and the real answer appears: among the hours that actually carry volume, 17:00 is worst at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062. <strong>A rate without a denominator is not an insight.</strong></p>
   </div>
 
   <div class="page-nav">

@@ -597,7 +597,7 @@ db.rides.findOne({}, { booked_at: 1, _id: 0 })   // now an ISODate</code></pre><
   </div>
 
   <div class="callout blue">
-    <p><strong>Sanity check on what you just loaded.</strong> 15,000 bookings; 9,343 completed (62.29%); average completed fare ₹235.73 against a total of ₹22,02,449; average distance 10.87 km; average driver rating 4.41; average VTAT 8.03 minutes. The busiest hour is 18:00 with 1,373 bookings, and the worst hour for failures is 17:00 at a 39.92% failure rate. Top pickup points: Noida Sector 62 (1,209), Indira Gandhi International Airport (1,183), New Delhi Railway Station (1,179), Gurgaon Cyber City (1,178), Connaught Place (1,139). You will reproduce every one of these figures yourself in Lectures 13 and 14.</p>
+    <p><strong>Sanity check on what you just loaded.</strong> 15,000 bookings; 9,343 completed (62.29%); average completed fare ₹235.73 against a total of ₹22,02,449; average distance 10.87 km; average driver rating 4.41; average VTAT 8.03 minutes. The busiest hour is 18:00 with 1,373 bookings, and the worst failure rate among the hours that actually carry volume is 17:00 at 39.92% — higher than the 18:00 peak's 37.14%, even though 18:00 takes 1,373 bookings to 17:00's 1,062. Top pickup points: Noida Sector 62 (1,209), Indira Gandhi International Airport (1,183), New Delhi Railway Station (1,179), Gurgaon Cyber City (1,178), Connaught Place (1,139). You will reproduce every one of these figures yourself in Lectures 13 and 14.</p>
   </div>
 
   <h3>Explore in Compass Before You Leave</h3>
